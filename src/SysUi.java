@@ -50,6 +50,7 @@ public class SysUi implements IXposedHookInitPackageResources, IXposedHookLoadPa
     @Override
     public void handleLoadPackage(XC_LoadPackage.LoadPackageParam lp) {
         if (!PKG.equals(lp.packageName) || !lp.processName.equals(PKG)) return;
+        dumpNames(lp.classLoader);
         Class<?> nav = null;
         String[] names = {
             "com.android.systemui.navigationbar.views.NavigationBarView",
@@ -92,5 +93,26 @@ public class SysUi implements IXposedHookInitPackageResources, IXposedHookLoadPa
             });
             XposedBridge.log(TAG + "hooked setNavigationIconHints");
         } catch (Throwable t) { XposedBridge.log(TAG + "hints hook failed: " + t); }
+    }
+
+    /** Discovery: log SystemUI drawable names that look like status bar icons. */
+    static void dumpNames(ClassLoader cl) {
+        try {
+            Class<?> r = XposedHelpers.findClassIfExists("com.android.systemui.R$drawable", cl);
+            if (r == null) { XposedBridge.log(TAG + "R$drawable not found"); return; }
+            java.util.regex.Pattern pat = java.util.regex.Pattern.compile(
+                "stat_sys|signal|wifi|battery|bluetooth|airplane|flight|alarm|vibrate|mute|" +
+                "silent|zen|dnd|location|hotspot|nfc|cast|mobile|data_|roam|volte|vowifi|5g|4g|3g|lte");
+            StringBuilder sb = new StringBuilder();
+            int n = 0, total = 0;
+            for (java.lang.reflect.Field f : r.getFields()) {
+                total++;
+                if (!pat.matcher(f.getName()).find()) continue;
+                sb.append(f.getName()).append(' ');
+                if (++n % 15 == 0) { XposedBridge.log(TAG + "names: " + sb); sb.setLength(0); }
+            }
+            if (sb.length() > 0) XposedBridge.log(TAG + "names: " + sb);
+            XposedBridge.log(TAG + "names done, matched=" + n + " of " + total);
+        } catch (Throwable t) { XposedBridge.log(TAG + "dumpNames failed: " + t); }
     }
 }
