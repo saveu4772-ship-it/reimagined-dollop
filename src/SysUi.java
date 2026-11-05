@@ -31,6 +31,40 @@ public class SysUi implements IXposedHookInitPackageResources, IXposedHookLoadPa
         replace(p, "ic_sysbar_home_quick_step", 1);
         replace(p, "ic_sysbar_recent", 2);
         replace(p, "ic_sysbar_back_ime", 3);
+        for (String[] m : KK) replaceKk(p, m[0], m[1]);
+    }
+
+
+    // ---- KitKat status bar icons: realme resource name -> KkIcons key ----
+    static final String[][] KK = {
+        {"ic_mobile_strength_0","sig0"},{"ic_mobile_strength_1","sig1"},{"ic_mobile_strength_2","sig2"},
+        {"ic_mobile_strength_3","sig3"},{"ic_mobile_strength_4","sig4"},
+        {"ic_mobile_call_strength_0","sig0"},{"ic_mobile_call_strength_1","sig1"},{"ic_mobile_call_strength_2","sig2"},
+        {"ic_mobile_call_strength_3","sig3"},{"ic_mobile_call_strength_4","sig4"},
+        {"stat_signal_wifi_signal_0","wifi0"},{"stat_signal_wifi_signal_1","wifi1"},{"stat_signal_wifi_signal_2","wifi2"},
+        {"stat_signal_wifi_signal_3","wifi3"},{"stat_signal_wifi_signal_4","wifi4"},
+        {"stat_signal_activity_wifi_in","wifi_in"},{"stat_signal_activity_wifi_out","wifi_out"},
+        {"stat_signal_activity_wifi_inout","wifi_inout"},
+        {"ic_3g_mobiledata","d3g"},{"ic_4g_mobiledata","d4g"},{"ic_4g_lte_mobiledata","d4g"},
+        {"ic_lte_mobiledata","d4g"},{"ic_e_mobiledata","de"},{"ic_g_mobiledata","dg"},
+        {"ic_h_mobiledata","dh"},{"ic_h_plus_mobiledata","dh"},{"ic_1x_mobiledata","d1x"},
+        {"stat_sys_data_bluetooth","bt"},{"stat_sys_data_bluetooth_connected","btc"},
+        {"stat_sys_airplane_mode","air"},
+    };
+
+    static void replaceKk(XC_InitPackageResources.InitPackageResourcesParam p, String name, final String key) {
+        try {
+            p.res.setReplacement(PKG, "drawable", name, new XResources.DrawableLoader() {
+                @Override public Drawable newDrawable(XResources res, int id) throws Throwable {
+                    Drawable d = KkIcons.get(res, key);
+                    if (d == null) throw new IllegalStateException("no icon " + key);
+                    return d;
+                }
+            });
+            XposedBridge.log(TAG + "kk replaced " + name);
+        } catch (Throwable t) {
+            XposedBridge.log(TAG + "kk skip " + name + ": " + t);
+        }
     }
 
     static void replace(XC_InitPackageResources.InitPackageResourcesParam p, String name, final int kind) {
