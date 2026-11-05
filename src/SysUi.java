@@ -86,6 +86,7 @@ public class SysUi implements IXposedHookInitPackageResources, IXposedHookLoadPa
         if (!PKG.equals(lp.packageName) || !lp.processName.equals(PKG)) return;
         dumpNames(lp.classLoader);
         hookBattery(lp.classLoader);
+        QsPanel.hookStatusBar(lp.classLoader);
         Class<?> nav = null;
         String[] names = {
             "com.android.systemui.navigationbar.views.NavigationBarView",
