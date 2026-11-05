@@ -85,6 +85,7 @@ public class SysUi implements IXposedHookInitPackageResources, IXposedHookLoadPa
     public void handleLoadPackage(XC_LoadPackage.LoadPackageParam lp) {
         if (!PKG.equals(lp.packageName) || !lp.processName.equals(PKG)) return;
         dumpNames(lp.classLoader);
+        hookBattery(lp.classLoader);
         Class<?> nav = null;
         String[] names = {
             "com.android.systemui.navigationbar.views.NavigationBarView",
@@ -127,6 +128,40 @@ public class SysUi implements IXposedHookInitPackageResources, IXposedHookLoadPa
             });
             XposedBridge.log(TAG + "hooked setNavigationIconHints");
         } catch (Throwable t) { XposedBridge.log(TAG + "hints hook failed: " + t); }
+    }
+
+
+    // ---- KitKat battery: swap the icon image after SystemUI updates it ----
+    static void hookBattery(ClassLoader cl) {
+        try {
+            Class<?> c = XposedHelpers.findClassIfExists("com.android.systemui.battery.BatteryMeterView", cl);
+            if (c == null) { XposedBridge.log(TAG + "BatteryMeterView not found"); return; }
+            XC_MethodHook h = new XC_MethodHook() {
+                @Override protected void afterHookedMethod(MethodHookParam param) {
+                    applyBattery(param.thisObject);
+                }
+            };
+            String[] ms = {"onBatteryLevelChanged", "updateDrawable", "onPowerSaveChanged",
+                    "updateColors", "setColorsFromContext", "onBatteryUnknownStateChanged"};
+            for (String m : ms) {
+                int n = XposedBridge.hookAllMethods(c, m, h).size();
+                XposedBridge.log(TAG + "battery hook " + m + " x" + n);
+            }
+        } catch (Throwable t) { XposedBridge.log(TAG + "battery hook failed: " + t); }
+    }
+
+    static void applyBattery(Object bmv) {
+        try {
+            ImageView iv = (ImageView) XposedHelpers.getObjectField(bmv, "mBatteryIconView");
+            int level = XposedHelpers.getIntField(bmv, "mLevel");
+            boolean charging = false;
+            try { charging = XposedHelpers.getBooleanField(bmv, "mPluggedIn"); } catch (Throwable ignored) {}
+            Drawable d = KkIcons.battery(iv.getResources(), level, charging);
+            if (d != null) {
+                iv.setImageTintList(null);
+                iv.setImageDrawable(d);
+            }
+        } catch (Throwable t) { XposedBridge.log(TAG + "applyBattery: " + t); }
     }
 
     /** Discovery: log SystemUI drawable names that look like status bar icons. */
