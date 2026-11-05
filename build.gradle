@@ -7,7 +7,7 @@ android {
     compileOptions { sourceCompatibility JavaVersion.VERSION_1_8; targetCompatibility JavaVersion.VERSION_1_8 }
     sourceSets.main {
         manifest.srcFile 'AndroidManifest.xml'
-        java.srcDirs = ['.']
+        java.srcDirs = ['src']
         res.srcDirs = ['res']
         assets.srcDirs = ['assets']
     }
