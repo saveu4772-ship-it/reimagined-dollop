@@ -57,8 +57,8 @@ public class QsPanel {
     static boolean armed, fired;
 
     // tiles
-    static ImageView iWifi, iSig, iBat, iAir, iBt, iLoc, iAlarm, iBri;
-    static TextView tWifi, tSig, tBat, tAir, tBt, tLoc, tAlarm, tBri;
+    static ImageView iUser, iWifi, iSig, iBat, iAir, iBt, iLoc, iAlarm, iBri;
+    static TextView tUser, tWifi, tSig, tBat, tAir, tBt, tLoc, tAlarm, tBri;
 
     // ------------------------------------------------------------------ hook
     static void hookStatusBar(ClassLoader cl) {
@@ -203,20 +203,20 @@ public class QsPanel {
         panel.setClickable(true);
         panelView = panel;
         FrameLayout.LayoutParams plp = new FrameLayout.LayoutParams(-1, -2);
-        plp.topMargin = sbh;
+        plp.topMargin = 0;   // overlay is already inset below the status bar
         r.addView(panel, plp);
 
         // ---- header: big thin clock + date, list icon on the right
         LinearLayout head = new LinearLayout(c);
         head.setOrientation(LinearLayout.HORIZONTAL);
         head.setGravity(Gravity.BOTTOM);
-        head.setPadding(dp(c, 14), dp(c, 12), dp(c, 14), dp(c, 12));
+        head.setPadding(dp(c, 14), dp(c, 2), dp(c, 14), dp(c, 6));
 
         TextClock time = new TextClock(c);
         time.setFormat12Hour("h:mm");
         time.setFormat24Hour("HH:mm");
         time.setTextColor(Color.WHITE);
-        time.setTextSize(TypedValue.COMPLEX_UNIT_SP, 50);
+        time.setTextSize(TypedValue.COMPLEX_UNIT_SP, 46);
         time.setTypeface(Typeface.create("sans-serif-thin", Typeface.NORMAL));
         time.setIncludeFontPadding(false);
         head.addView(time);
@@ -250,22 +250,21 @@ public class QsPanel {
 
         // ---- 3x3 grid of dark flat tiles
         int tileW = W / 3;
-        int tileH = (int) (tileW * 0.86f);
+        int tileH = tileW;   // KitKat tiles are square
         int gap = 2;
 
+        // same order as the real KitKat panel
         LinearLayout row1 = row(c);
+        iUser = new ImageView(c); tUser = new TextView(c);
+        row1.addView(tile(c, iUser, tUser, tileW, tileH, gap, null));
         iBri = new ImageView(c); tBri = new TextView(c);
         row1.addView(tile(c, iBri, tBri, tileW, tileH, gap, new Runnable() {
             @Override public void run() { cycleBrightness(); }
         }));
-        iBat = new ImageView(c); tBat = new TextView(c);
-        row1.addView(tile(c, new ImageView(c) {{ setImageDrawable(glyph(c.getResources(), 1)); }},
-                new TextView(c) {{ setText("SETTINGS"); }}, tileW, tileH, gap, new Runnable() {
+        final ImageView iSet = new ImageView(c); final TextView tSet = new TextView(c);
+        iSet.setImageDrawable(glyph(res, 1)); tSet.setText("SETTINGS");
+        row1.addView(tile(c, iSet, tSet, tileW, tileH, gap, new Runnable() {
             @Override public void run() { openSettings(Settings.ACTION_SETTINGS); }
-        }));
-        iAlarm = new ImageView(c); tAlarm = new TextView(c);
-        row1.addView(tile(c, iAlarm, tAlarm, tileW, tileH, gap, new Runnable() {
-            @Override public void run() { openSettings(android.provider.AlarmClock.ACTION_SHOW_ALARMS); }
         }));
         panel.addView(row1);
 
@@ -276,7 +275,7 @@ public class QsPanel {
         }));
         iSig = new ImageView(c); tSig = new TextView(c);
         row2.addView(tile(c, iSig, tSig, tileW, tileH, gap, null));
-        // battery tile (reuses iBat/tBat created above)
+        iBat = new ImageView(c); tBat = new TextView(c);
         row2.addView(tile(c, iBat, tBat, tileW, tileH, gap, new Runnable() {
             @Override public void run() { openSettings("android.intent.action.POWER_USAGE_SUMMARY"); }
         }));
@@ -296,6 +295,13 @@ public class QsPanel {
             @Override public void run() { toggleLocation(); }
         }));
         panel.addView(row3);
+
+        LinearLayout row4 = row(c);
+        iAlarm = new ImageView(c); tAlarm = new TextView(c);
+        row4.addView(tile(c, iAlarm, tAlarm, tileW, tileH, gap, new Runnable() {
+            @Override public void run() { openSettings(android.provider.AlarmClock.ACTION_SHOW_ALARMS); }
+        }));
+        panel.addView(row4);
 
         // thin handle line at the bottom
         View line = new View(c);
@@ -321,9 +327,9 @@ public class QsPanel {
         bg.addState(new int[]{}, new ColorDrawable(0xFF1F1F1F));
         t.setBackground(bg);
         icon.setScaleType(ImageView.ScaleType.FIT_CENTER);
-        t.addView(icon, new LinearLayout.LayoutParams(dp(c, 40), dp(c, 40)));
-        label.setTextColor(Color.WHITE);
-        label.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
+        t.addView(icon, new LinearLayout.LayoutParams(dp(c, 32), dp(c, 32)));
+        label.setTextColor(0xFFDDDDDD);
+        label.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
         label.setGravity(Gravity.CENTER);
         label.setMaxLines(2);
         label.setPadding(dp(c, 4), dp(c, 8), dp(c, 4), 0);
@@ -355,6 +361,11 @@ public class QsPanel {
         final Context c = ctx;
         if (c == null || root == null) return;
         Resources res = c.getResources();
+        try { // user
+            android.os.UserManager um = (android.os.UserManager) c.getSystemService(Context.USER_SERVICE);
+            String name = um.getUserName();
+            set(iUser, tUser, glyph(res, 5), (name == null || name.length() == 0 ? "OWNER" : name).toUpperCase(), true);
+        } catch (Throwable t) { XposedBridge.log(TAG + "user: " + t); }
         try { // brightness
             int br = Settings.System.getInt(c.getContentResolver(), Settings.System.SCREEN_BRIGHTNESS, 128);
             set(iBri, tBri, glyph(res, 0), (br * 100 / 255) + "%", true);
@@ -520,6 +531,11 @@ public class QsPanel {
             p.setStyle(Paint.Style.FILL);
             cv.drawCircle(24, 30, 14, p);
             cv.drawCircle(104, 30, 14, p);
+        } else if (kind == 5) {                       // user silhouette
+            p.setStyle(Paint.Style.FILL);
+            cv.drawCircle(64, 42, 24, p);
+            RectF body = new RectF(24, 74, 104, 150);
+            cv.drawArc(body, 180, 180, true, p);
         } else {                                      // list icon (header)
             p.setStyle(Paint.Style.FILL);
             for (int i = 0; i < 3; i++) {
