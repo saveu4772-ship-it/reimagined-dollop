@@ -68,6 +68,12 @@ public class SysUi implements IXposedHookInitPackageResources, IXposedHookLoadPa
             XposedBridge.log(TAG + "hooked orientBackButton");
         } catch (Throwable t) { XposedBridge.log(TAG + "orient hook failed: " + t); }
 
+        // 1b) stop AOSP rotating the home icon 90 deg when the bar is vertical (landscape)
+        try {
+            XposedBridge.hookAllMethods(nav, "orientHomeButton", XC_MethodReplacement.DO_NOTHING);
+            XposedBridge.log(TAG + "hooked orientHomeButton");
+        } catch (Throwable t) { XposedBridge.log(TAG + "home orient hook failed: " + t); }
+
         // 2) swap in the ICS "down chevron" while the keyboard is up
         try {
             XposedBridge.hookAllMethods(nav, "setNavigationIconHints", new XC_MethodHook() {
