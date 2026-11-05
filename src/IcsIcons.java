@@ -1,6 +1,6 @@
 package ics.recents;
 
-import android.content.res.XResources;
+import android.content.res.Resources;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.drawable.BitmapDrawable;
@@ -126,10 +126,49 @@ public class IcsIcons {
         "fNssXBQbmkWswrK9l3UKJvCitna9DVyvr3eY9bJa664mYnWJEtfrzHZ0hI5nEa2LfwEHcs4pRvnknC8Dr1JuiSTmF1fTaqJJnSmb" +
         "wv2SUroL87GWJEk6P2xCL1GXd1nLwHwBdZ1nm83rY8E8Rk1i47QeziJaM3uhV2OhkyRJkiRJkiRJkiRJkiRJkiRJkiRJkiRJkiRJ" +
         "kiRJkiRJkiRJkiRJkiRJkiRJkiRJkiRJ58p/XALOf1808GkAAAAASUVORK5CYII=";
+    static final String BACK_IME =
+        "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";
 
-    /** kind: 0=back, 1=home, 2=recent */
-    public static Drawable get(XResources res, int kind) {
-        String s = kind == 0 ? BACK : kind == 1 ? HOME : RECENT;
+    /** kind: 0=back, 1=home, 2=recent, 3=back (keyboard open) */
+    public static Drawable get(Resources res, int kind) {
+        String s = kind == 0 ? BACK : kind == 1 ? HOME : kind == 2 ? RECENT : BACK_IME;
         byte[] d = Base64.decode(s, Base64.DEFAULT);
         BitmapFactory.Options o = new BitmapFactory.Options();
         o.inDensity = 480;                       // xxhdpi source
