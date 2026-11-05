@@ -189,8 +189,9 @@ public class Hook implements IXposedHookLoadPackage {
                 XposedHelpers.findClass("android.app.ActivityTaskManager", null), "getInstance");
         Object userId = XposedHelpers.callStaticMethod(
                 XposedHelpers.findClass("android.os.UserHandle", null), "myUserId");
-        Object slice = XposedHelpers.callMethod(atm, "getRecentTasks", 20, 0x2, userId);
-        return (List<Object>) XposedHelpers.callMethod(slice, "getList");
+        Object res = XposedHelpers.callMethod(atm, "getRecentTasks", 20, 0x2, userId);
+        if (res instanceof List) return (List<Object>) res;
+        return (List<Object>) XposedHelpers.callMethod(res, "getList");
     }
 
     static Bitmap thumbnail(int taskId) {
