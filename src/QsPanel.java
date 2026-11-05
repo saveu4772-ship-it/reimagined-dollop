@@ -404,12 +404,12 @@ public class QsPanel {
         } catch (Throwable t) { XposedBridge.log(TAG + "bat: " + t); }
         try { // airplane
             boolean air = Settings.Global.getInt(c.getContentResolver(), Settings.Global.AIRPLANE_MODE_ON, 0) == 1;
-            set(iAir, tAir, KkIcons.get(res, "air"), "AEROPLANE MODE", air);
+            set(iAir, tAir, KkIcons.get(res, "qs_air"), "AIRPLANE MODE", air);
         } catch (Throwable t) { XposedBridge.log(TAG + "air: " + t); }
         try { // bluetooth
             BluetoothAdapter ad = BluetoothAdapter.getDefaultAdapter();
             boolean on = ad != null && ad.isEnabled();
-            set(iBt, tBt, KkIcons.get(res, "bt"), on ? "BLUETOOTH ON" : "BLUETOOTH OFF", on);
+            set(iBt, tBt, KkIcons.get(res, "qs_bt"), on ? "BLUETOOTH ON" : "BLUETOOTH OFF", on);
         } catch (Throwable t) { XposedBridge.log(TAG + "bt: " + t); }
         try { // location
             android.location.LocationManager lm = (android.location.LocationManager) c.getSystemService(Context.LOCATION_SERVICE);
@@ -424,7 +424,7 @@ public class QsPanel {
                 text = new java.text.SimpleDateFormat("EEE HH:mm", java.util.Locale.getDefault())
                         .format(new java.util.Date(ai.getTriggerTime())).toUpperCase();
             }
-            set(iAlarm, tAlarm, glyph(res, 3), text, ai != null);
+            set(iAlarm, tAlarm, KkIcons.get(res, "qs_alarm"), text, ai != null);
         } catch (Throwable t) { XposedBridge.log(TAG + "alarm: " + t); }
     }
 
