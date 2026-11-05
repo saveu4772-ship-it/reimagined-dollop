@@ -35,20 +35,27 @@ public class Hook implements IXposedHookLoadPackage {
         if (helper == null) return;
         XposedBridge.log(TAG + "found OverviewCommandHelper in " + lpp.packageName);
 
-        XposedBridge.hookAllMethods(helper, "onOverviewToggle", new XC_MethodReplacement() {
+        // Logging only: shows what the helper receives
+        XposedBridge.hookAllMethods(helper, "addCommand", new de.robv.android.xposed.XC_MethodHook() {
+            @Override protected void beforeHookedMethod(MethodHookParam p) {
+                XposedBridge.log(TAG + "addCommand " + java.util.Arrays.toString(p.args));
+            }
+        });
+
+        // Real entry point for the recents button (3-button nav)
+        Class<?> binder = XposedHelpers.findClassIfExists(
+                "com.android.quickstep.TouchInteractionService$TISBinder", lpp.classLoader);
+        XposedBridge.log(TAG + "TISBinder " + (binder != null ? "found" : "NOT found"));
+        if (binder == null) return;
+        XC_MethodReplacement open = new XC_MethodReplacement() {
             @Override protected Object replaceHookedMethod(MethodHookParam p) {
-                XposedBridge.log(TAG + "onOverviewToggle");
+                XposedBridge.log(TAG + "binder " + p.method.getName());
                 toggle(appContext());
                 return null;
             }
-        });
-        XposedBridge.hookAllMethods(helper, "onOverviewShown", new XC_MethodReplacement() {
-            @Override protected Object replaceHookedMethod(MethodHookParam p) {
-                XposedBridge.log(TAG + "onOverviewShown");
-                toggle(appContext());
-                return null;
-            }
-        });
+        };
+        XposedBridge.hookAllMethods(binder, "onOverviewToggle", open);
+        XposedBridge.hookAllMethods(binder, "onOverviewShown", open);
     }
 
     static Context appContext() {
