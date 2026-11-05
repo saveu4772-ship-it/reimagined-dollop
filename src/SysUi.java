@@ -142,7 +142,8 @@ public class SysUi implements IXposedHookInitPackageResources, IXposedHookLoadPa
                 }
             };
             String[] ms = {"onBatteryLevelChanged", "updateDrawable", "onPowerSaveChanged",
-                    "updateColors", "setColorsFromContext", "onBatteryUnknownStateChanged"};
+                    "updateColors", "setColorsFromContext", "onBatteryUnknownStateChanged",
+                    "scaleBatteryMeterViews"};
             for (String m : ms) {
                 int n = XposedBridge.hookAllMethods(c, m, h).size();
                 XposedBridge.log(TAG + "battery hook " + m + " x" + n);
@@ -159,6 +160,13 @@ public class SysUi implements IXposedHookInitPackageResources, IXposedHookLoadPa
             Drawable d = KkIcons.battery(iv.getResources(), level, charging);
             if (d != null) {
                 iv.setImageTintList(null);
+                iv.setScaleType(ImageView.ScaleType.CENTER);   // draw at KitKat's real size, no shrinking
+                android.view.ViewGroup.LayoutParams lp = iv.getLayoutParams();
+                if (lp != null) {
+                    lp.width = d.getIntrinsicWidth();
+                    lp.height = d.getIntrinsicHeight();
+                    iv.setLayoutParams(lp);
+                }
                 iv.setImageDrawable(d);
             }
         } catch (Throwable t) { XposedBridge.log(TAG + "applyBattery: " + t); }
