@@ -3,7 +3,11 @@ package ics.recents;
 import android.content.res.XResources;
 import android.graphics.drawable.Drawable;
 import android.view.View;
+import android.view.ViewGroup;
+import android.view.ViewParent;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
+import android.widget.TextView;
 
 import de.robv.android.xposed.IXposedHookInitPackageResources;
 import de.robv.android.xposed.IXposedHookLoadPackage;
@@ -86,6 +90,7 @@ public class SysUi implements IXposedHookInitPackageResources, IXposedHookLoadPa
         if (!PKG.equals(lp.packageName) || !lp.processName.equals(PKG)) return;
         dumpNames(lp.classLoader);
         hookBattery(lp.classLoader);
+        hookClock(lp.classLoader);
         QsPanel.hookStatusBar(lp.classLoader);
         Class<?> nav = null;
         String[] names = {
@@ -171,6 +176,75 @@ public class SysUi implements IXposedHookInitPackageResources, IXposedHookLoadPa
                 iv.setImageDrawable(d);
             }
         } catch (Throwable t) { XposedBridge.log(TAG + "applyBattery: " + t); }
+    }
+
+    // ---- status bar clock: TechnoUI font + move to the right of the battery ----
+    static final int KEY_MOVED = 0x1c5ec10c;
+
+    static void hookClock(ClassLoader cl) {
+        Class<?> clock = null;
+        String[] names = {
+            "com.android.systemui.statusbar.policy.Clock",
+            "com.android.systemui.statusbar.policy.ui.Clock"
+        };
+        for (String n : names) {
+            clock = XposedHelpers.findClassIfExists(n, cl);
+            if (clock != null) { XposedBridge.log(TAG + "clock class " + n); break; }
+        }
+        if (clock == null) { XposedBridge.log(TAG + "Clock class not found"); return; }
+        try {
+            XposedBridge.hookAllMethods(clock, "onAttachedToWindow", new XC_MethodHook() {
+                @Override protected void afterHookedMethod(MethodHookParam param) {
+                    try {
+                        final TextView c = (TextView) param.thisObject;
+                        final View root = statusBarRoot(c);
+                        if (root == null) return;          // shade / keyguard clocks: leave alone
+                        android.graphics.Typeface tf = IcsFont.get(c.getContext());
+                        if (tf != null) c.setTypeface(tf);
+                        if (c.getTag(KEY_MOVED) != null) return;
+                        c.setTag(KEY_MOVED, Boolean.TRUE);
+                        c.post(new Runnable() { @Override public void run() { moveRight(c, root); } });
+                    } catch (Throwable t) { XposedBridge.log(TAG + "clock hook failed: " + t); }
+                }
+            });
+            XposedBridge.log(TAG + "hooked Clock.onAttachedToWindow");
+        } catch (Throwable t) { XposedBridge.log(TAG + "clock hook failed: " + t); }
+    }
+
+    /** The PhoneStatusBarView ancestor, or null if this clock is in the shade/keyguard. */
+    static View statusBarRoot(View v) {
+        StringBuilder chain = new StringBuilder();
+        View found = null;
+        ViewParent p = v.getParent();
+        while (p != null) {
+            String n = p.getClass().getName();
+            chain.append(n.substring(n.lastIndexOf('.') + 1)).append('<');
+            if (n.contains("QuickStatusBar") || n.contains("ShadeHeader") || n.contains("QSContainer")
+                    || n.contains("Keyguard")) { found = null; break; }
+            if (found == null && n.endsWith("PhoneStatusBarView")) found = (View) p;
+            p = p.getParent();
+        }
+        XposedBridge.log(TAG + "clock chain: " + chain + (found != null ? " -> MAIN" : " -> skip"));
+        return found;
+    }
+
+    static void moveRight(TextView c, View root) {
+        try {
+            int id = c.getResources().getIdentifier("system_icons", "id", PKG);
+            View sys = id == 0 ? null : root.findViewById(id);
+            if (!(sys instanceof LinearLayout)) {
+                XposedBridge.log(TAG + "system_icons not found/LinearLayout: " + sys);
+                return;
+            }
+            ViewGroup old = (ViewGroup) c.getParent();
+            if (old != null) old.removeView(c);
+            float d = c.getResources().getDisplayMetrics().density;
+            c.setPadding((int) (6 * d), 0, (int) (2 * d), 0);
+            c.setGravity(android.view.Gravity.CENTER_VERTICAL);
+            ((LinearLayout) sys).addView(c, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.MATCH_PARENT));
+            XposedBridge.log(TAG + "clock moved to system_icons (right)");
+        } catch (Throwable t) { XposedBridge.log(TAG + "moveRight failed: " + t); }
     }
 
     /** Discovery: log SystemUI drawable names that look like status bar icons. */
