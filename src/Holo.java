@@ -136,7 +136,30 @@ public class Holo {
         w.setBackgroundDrawable(HoloArt.nine(decor.getResources(), "dialog_full"));
         clearInnerBackgrounds(decor, 0);
         whiteText(decor);
+        flatten(decor);
+        // lists (Wi-Fi networks, etc.) fill in after show(): square their cards as they appear
+        final View dv = decor;
+        dv.getViewTreeObserver().addOnGlobalLayoutListener(new android.view.ViewTreeObserver.OnGlobalLayoutListener() {
+            long last;
+            @Override public void onGlobalLayout() {
+                long now = android.os.SystemClock.uptimeMillis();
+                if (now - last < 250) return;
+                last = now;
+                try { flatten(dv); } catch (Throwable ignored) {}
+            }
+        });
         XposedBridge.log(TAG + "dialog skinned " + d.getClass().getSimpleName());
+    }
+
+    /** square every rounded card background in the tree (any depth), no clipping to rounded outlines */
+    static void flatten(View v) {
+        Drawable bg = v.getBackground();
+        if (bg != null) LockText.square(bg, 0);
+        if (v instanceof ViewGroup) {
+            ViewGroup g = (ViewGroup) v;
+            if (g.getClipToOutline()) g.setClipToOutline(false);
+            for (int i = 0; i < g.getChildCount(); i++) flatten(g.getChildAt(i));
+        }
     }
 
     /** flatten the modern rounded/tinted panels inside the dialog so the holo frame shows through */
