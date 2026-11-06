@@ -2,64 +2,33 @@ package ics.recents;
 
 import android.content.Context;
 import android.graphics.Typeface;
-import android.util.Base64;
 
 import java.io.File;
-import java.io.FileOutputStream;
 
-/** TechnoUI's AndroidClock.ttf (digits, colon, A E M P), embedded as base64. */
+/** KitKat status bar clock font: Roboto Regular. */
 public class IcsFont {
-    static final String TTF =
-        "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" +
-        "NSG0GRkB1lD+SAG4GRn+KgIIAP8jUPUjUAAAAAAOAK4AAQAAAAAAAABLAJgAAQAAAAAAAQAMAP4AAQAAAAAAAgAHARsAAQAAAAAA" +
-        "AwAhAWcAAQAAAAAABAAMAaMAAQAAAAAABQAQAdIAAQAAAAAABgAMAf0AAwABBAkAAACWAAAAAwABBAkAAQAYAOQAAwABBAkAAgAO" +
-        "AQsAAwABBAkAAwBCASMAAwABBAkABAAYAYkAAwABBAkABQAgAbAAAwABBAkABgAYAeMAQwByAGUAYQB0AGUAZAAgAGIAeQAgAEMA" +
-        "aAByAGkAcwB0AGkAYQBuACAAUgBvAGIAZQByAHQAcwBvAG4AIAB3AGkAdABoACAARgBvAG4AdABGAG8AcgBnAGUAIAAyAC4AMAAg" +
-        "ACgAaAB0AHQAcAA6AC8ALwBmAG8AbgB0AGYAbwByAGcAZQAuAHMAZgAuAG4AZQB0ACkAAENyZWF0ZWQgYnkgQ2hyaXN0aWFuIFJv" +
-        "YmVydHNvbiB3aXRoIEZvbnRGb3JnZSAyLjAgKGh0dHA6Ly9mb250Zm9yZ2Uuc2YubmV0KQAAQQBuAGQAcgBvAGkAZABDAGwAbwBj" +
-        "AGsAAEFuZHJvaWRDbG9jawAAUgBlAGcAdQBsAGEAcgAAUmVndWxhcgAARwBvAG8AZwBsAGUAIAA6ACAAQQBuAGQAcgBvAGkAZABD" +
-        "AGwAbwBjAGsAIAA6ACAAMQA3AC0AMQAtADIAMAAxADEAAEdvb2dsZSA6IEFuZHJvaWRDbG9jayA6IDE3LTEtMjAxMQAAQQBuAGQA" +
-        "cgBvAGkAZABDAGwAbwBjAGsAAEFuZHJvaWRDbG9jawAAVgBlAHIAcwBpAG8AbgAgADAAMAAxAC4AMAAwADAAIAAAVmVyc2lvbiAw" +
-        "MDEuMDAwIAAAQQBuAGQAcgBvAGkAZABDAGwAbwBjAGsAAEFuZHJvaWRDbG9jawAAAgAAAAAAAP+DADIAAAAAAAAAAAAAAAAAAAAA" +
-        "AAAAAAASAAAAAQACABMAFAAVABYAFwAYABkAGgAbABwAHQAkACgAMAAzAAAAAAAB//8AAgAAAAEAAAAAxtQumQAAAADJBy7dAAAA" +
-        "AMlajYo=";
-
     static Typeface cached;
 
     public static synchronized Typeface get(Context c) {
         if (cached != null) return cached;
-        try {
-            File f = new File(c.getCacheDir(), "ics_clock.ttf");
-            if (!f.exists() || f.length() == 0) {
-                FileOutputStream o = new FileOutputStream(f);
-                o.write(Base64.decode(TTF, Base64.DEFAULT));
-                o.close();
-            }
-            cached = Typeface.createFromFile(f);
-        } catch (Throwable t) {
-            de.robv.android.xposed.XposedBridge.log("[IcsSysUi] font load failed: " + t);
+        // realme may map "sans-serif" to its own font, so prefer the real Roboto file
+        String[] files = {
+            "/system/fonts/Roboto-Regular.ttf",
+            "/system/fonts/RobotoStatic-Regular.ttf",
+            "/system/fonts/Roboto[wdth,wght].ttf",
+            "/system/fonts/Roboto-Regular.otf"
+        };
+        for (String p : files) {
+            try {
+                if (new File(p).exists()) {
+                    cached = Typeface.createFromFile(p);
+                    de.robv.android.xposed.XposedBridge.log("[IcsSysUi] clock font " + p);
+                    return cached;
+                }
+            } catch (Throwable ignored) {}
         }
+        de.robv.android.xposed.XposedBridge.log("[IcsSysUi] clock font: Roboto file not found, using sans-serif");
+        cached = Typeface.create("sans-serif", Typeface.NORMAL);
         return cached;
     }
 }

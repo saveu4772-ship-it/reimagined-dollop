@@ -201,6 +201,7 @@ public class SysUi implements IXposedHookInitPackageResources, IXposedHookLoadPa
                         if (root == null) return;          // shade / keyguard clocks: leave alone
                         android.graphics.Typeface tf = IcsFont.get(c.getContext());
                         if (tf != null) c.setTypeface(tf);
+                        c.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 16);   // KitKat clock size
                         if (c.getTag(KEY_MOVED) != null) return;
                         c.setTag(KEY_MOVED, Boolean.TRUE);
                         c.post(new Runnable() { @Override public void run() { moveRight(c, root); } });
