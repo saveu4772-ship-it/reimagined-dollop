@@ -31,4 +31,50 @@ public class IcsFont {
         cached = Typeface.create("sans-serif", Typeface.NORMAL);
         return cached;
     }
+
+    static Typeface thinCached;
+    static boolean thinTried;
+
+    /** KitKat lock screen clock: Roboto Thin (falls back to Light, then a variable font at wght 100). */
+    public static synchronized Typeface thin(Context c) {
+        if (thinCached != null || thinTried) return thinCached;
+        thinTried = true;
+        try {
+            String[] have = new File("/system/fonts").list();
+            StringBuilder sb = new StringBuilder();
+            if (have != null) for (String h : have) if (h.toLowerCase().contains("roboto")) sb.append(h).append(' ');
+            de.robv.android.xposed.XposedBridge.log("[IcsSysUi] roboto fonts: " + sb);
+        } catch (Throwable ignored) {}
+        String[] statics = {
+            "/system/fonts/Roboto-Thin.ttf", "/system/fonts/RobotoStatic-Thin.ttf",
+            "/system/fonts/Roboto-Light.ttf", "/system/fonts/RobotoStatic-Light.ttf"
+        };
+        for (String p : statics) {
+            try {
+                if (new File(p).exists()) {
+                    thinCached = Typeface.createFromFile(p);
+                    de.robv.android.xposed.XposedBridge.log("[IcsSysUi] lock clock font " + p);
+                    return thinCached;
+                }
+            } catch (Throwable ignored) {}
+        }
+        String[] vars = {
+            "/system/fonts/Roboto[wdth,wght].ttf", "/system/fonts/RobotoFlex-Regular.ttf",
+            "/system/fonts/Roboto-Regular.ttf", "/system/fonts/RobotoStatic-Regular.ttf"
+        };
+        for (String p : vars) {
+            try {
+                if (!new File(p).exists()) continue;
+                Typeface t = new Typeface.Builder(p).setFontVariationSettings("'wght' 100").build();
+                if (t != null) {
+                    thinCached = t;
+                    de.robv.android.xposed.XposedBridge.log("[IcsSysUi] lock clock font (wght 100) " + p);
+                    return thinCached;
+                }
+            } catch (Throwable ignored) {}
+        }
+        de.robv.android.xposed.XposedBridge.log("[IcsSysUi] lock clock font: using sans-serif-thin");
+        thinCached = Typeface.create("sans-serif-thin", Typeface.NORMAL);
+        return thinCached;
+    }
 }

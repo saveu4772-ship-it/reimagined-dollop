@@ -175,9 +175,60 @@ public class SysUi implements IXposedHookZygoteInit, IXposedHookInitPackageResou
         } catch (Throwable t) { XposedBridge.log(TAG + "edge effect hook failed: " + t); }
     }
 
-    // ---- lock screen clock: thin KitKat look (best effort, class names vary by ROM) ----
+    // ---- lock screen clock: thin KitKat look. A15 uses the shared clock plugin
+    //      (com.android.systemui.shared.clocks.AnimatableClockView inside clock_default_large/small),
+    //      so match by class name AND by view id, and use a real Roboto thin file (realme remaps sans-serif). ----
+    static final java.util.HashMap<Integer, Boolean> LOCK_IDS = new java.util.HashMap<Integer, Boolean>();
+    static final String[] LOCK_ID_NAMES = {
+        "lockscreen_clock_view", "lockscreen_clock_view_large", "weather_clock_time", "lock_screen_clock"
+    };
+    static final java.util.HashSet<String> lockLogged = new java.util.HashSet<String>();
+
+    static void thin(TextView tv) {
+        try {
+            android.graphics.Typeface t = IcsFont.thin(tv.getContext());
+            if (t != null) tv.setTypeface(t);
+            try { tv.setFontVariationSettings(null); } catch (Throwable ignored) {}
+        } catch (Throwable e) { XposedBridge.log(TAG + "lock clock thin: " + e); }
+    }
+
+    static boolean isLockClockId(TextView tv) {
+        int id = tv.getId();
+        if (id == View.NO_ID) return false;
+        Boolean b = LOCK_IDS.get(id);
+        if (b == null) {
+            b = false;
+            try {
+                String n = tv.getResources().getResourceEntryName(id);
+                for (String x : LOCK_ID_NAMES) if (x.equals(n)) b = true;
+            } catch (Throwable ignored) {}
+            LOCK_IDS.put(id, b);
+        }
+        return b;
+    }
+
     static void hookLockClock(ClassLoader cl) {
+        // 1) by view id, whatever the class is
+        try {
+            XposedBridge.hookAllMethods(TextView.class, "onAttachedToWindow", new XC_MethodHook() {
+                @Override protected void afterHookedMethod(MethodHookParam param) {
+                    try {
+                        TextView tv = (TextView) param.thisObject;
+                        if (!isLockClockId(tv)) return;
+                        String key = tv.getClass().getName();
+                        synchronized (lockLogged) {
+                            if (lockLogged.add(key)) XposedBridge.log(TAG + "lock clock view " + key + " id=" + tv.getId());
+                        }
+                        thin(tv);
+                    } catch (Throwable ignored) {}
+                }
+            });
+            XposedBridge.log(TAG + "lock clock: TextView.onAttachedToWindow hooked");
+        } catch (Throwable t) { XposedBridge.log(TAG + "lock clock attach hook failed: " + t); }
+
+        // 2) by class (re-apply after the plugin restyles itself)
         String[] names = {
+            "com.android.systemui.shared.clocks.AnimatableClockView",
             "com.android.keyguard.AnimatableClockView",
             "com.android.keyguard.KeyguardClockSwitch"
         };
@@ -187,14 +238,20 @@ public class SysUi implements IXposedHookZygoteInit, IXposedHookInitPackageResou
             try {
                 int k = XposedBridge.hookAllConstructors(c, new XC_MethodHook() {
                     @Override protected void afterHookedMethod(MethodHookParam param) {
-                        try {
-                            if (param.thisObject instanceof TextView)
-                                ((TextView) param.thisObject).setTypeface(
-                                    android.graphics.Typeface.create("sans-serif-thin", android.graphics.Typeface.NORMAL));
-                        } catch (Throwable ignored) {}
+                        if (param.thisObject instanceof TextView) thin((TextView) param.thisObject);
                     }
                 }).size();
-                XposedBridge.log(TAG + "lock clock hooked " + n + " x" + k);
+                int m = 0;
+                for (String mn : new String[]{"setTextStyle", "refreshTime", "refreshText"}) {
+                    try {
+                        m += XposedBridge.hookAllMethods(c, mn, new XC_MethodHook() {
+                            @Override protected void afterHookedMethod(MethodHookParam param) {
+                                if (param.thisObject instanceof TextView) thin((TextView) param.thisObject);
+                            }
+                        }).size();
+                    } catch (Throwable ignored) {}
+                }
+                XposedBridge.log(TAG + "lock clock hooked " + n + " ctors x" + k + " restyle x" + m);
             } catch (Throwable t) { XposedBridge.log(TAG + "lock clock hook failed: " + t); }
         }
     }
