@@ -11,6 +11,7 @@ import android.widget.TextView;
 
 import de.robv.android.xposed.IXposedHookInitPackageResources;
 import de.robv.android.xposed.IXposedHookLoadPackage;
+import de.robv.android.xposed.IXposedHookZygoteInit;
 import de.robv.android.xposed.XC_MethodHook;
 import de.robv.android.xposed.XC_MethodReplacement;
 import de.robv.android.xposed.XposedBridge;
@@ -19,7 +20,7 @@ import de.robv.android.xposed.callbacks.XC_InitPackageResources;
 import de.robv.android.xposed.callbacks.XC_LoadPackage;
 
 /** ICS-style nav bar icons, incl. the keyboard-open (IME) back icon. */
-public class SysUi implements IXposedHookInitPackageResources, IXposedHookLoadPackage {
+public class SysUi implements IXposedHookZygoteInit, IXposedHookInitPackageResources, IXposedHookLoadPackage {
     static final String TAG = "[IcsSysUi] ";
     static final String PKG = "com.android.systemui";
     static final int HINT_BACK_ALT = 1; // StatusBarManager.NAVIGATION_HINT_BACK_ALT
@@ -95,9 +96,13 @@ public class SysUi implements IXposedHookInitPackageResources, IXposedHookLoadPa
     // ---- code hooks: keyboard-open back icon ----
     @Override
     public void handleLoadPackage(XC_LoadPackage.LoadPackageParam lp) {
+        XposedBridge.log(TAG + "BUILD v3 (volume + overscroll) loaded in " + lp.processName);
+        hookEdge();                       // overscroll glow in whichever scoped app this is
         if (!PKG.equals(lp.packageName) || !lp.processName.equals(PKG)) return;
         // dumpNames(lp.classLoader);   // discovery only; re-enable if you need new names
         hookBattery(lp.classLoader);
+        VolumePanel.hook(lp.classLoader);
+        hookLockClock(lp.classLoader);
         hookClock(lp.classLoader);
         QsPanel.hookStatusBar(lp.classLoader);
         hookNavGlow(lp.classLoader);
@@ -145,6 +150,54 @@ public class SysUi implements IXposedHookInitPackageResources, IXposedHookLoadPa
         } catch (Throwable t) { XposedBridge.log(TAG + "hints hook failed: " + t); }
     }
 
+
+    // ---- KitKat overscroll: blue edge glow instead of the Android 12+ stretch (all apps) ----
+    static boolean edgeDone;
+
+    @Override
+    public void initZygote(StartupParam startupParam) { hookEdge(); }
+
+    /** Runs in zygote (needs reboot) or in any app that is ticked in the module scope (force-stop the app). */
+    static synchronized void hookEdge() {
+        if (edgeDone) return;
+        edgeDone = true;
+        try {
+            XC_MethodHook h = new XC_MethodHook() {
+                @Override protected void afterHookedMethod(MethodHookParam param) {
+                    try {
+                        XposedHelpers.setIntField(param.thisObject, "mEdgeEffectType", 0); // TYPE_GLOW
+                        ((android.widget.EdgeEffect) param.thisObject).setColor(0xFF33B5E5);
+                    } catch (Throwable ignored) {}
+                }
+            };
+            int n = XposedBridge.hookAllConstructors(android.widget.EdgeEffect.class, h).size();
+            XposedBridge.log(TAG + "EdgeEffect ctors hooked x" + n);
+        } catch (Throwable t) { XposedBridge.log(TAG + "edge effect hook failed: " + t); }
+    }
+
+    // ---- lock screen clock: thin KitKat look (best effort, class names vary by ROM) ----
+    static void hookLockClock(ClassLoader cl) {
+        String[] names = {
+            "com.android.keyguard.AnimatableClockView",
+            "com.android.keyguard.KeyguardClockSwitch"
+        };
+        for (String n : names) {
+            Class<?> c = XposedHelpers.findClassIfExists(n, cl);
+            if (c == null) continue;
+            try {
+                int k = XposedBridge.hookAllConstructors(c, new XC_MethodHook() {
+                    @Override protected void afterHookedMethod(MethodHookParam param) {
+                        try {
+                            if (param.thisObject instanceof TextView)
+                                ((TextView) param.thisObject).setTypeface(
+                                    android.graphics.Typeface.create("sans-serif-thin", android.graphics.Typeface.NORMAL));
+                        } catch (Throwable ignored) {}
+                    }
+                }).size();
+                XposedBridge.log(TAG + "lock clock hooked " + n + " x" + k);
+            } catch (Throwable t) { XposedBridge.log(TAG + "lock clock hook failed: " + t); }
+        }
+    }
 
     // ---- KitKat nav button pressed glow ----
     static void hookNavGlow(ClassLoader cl) {
