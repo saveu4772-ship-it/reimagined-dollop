@@ -96,7 +96,7 @@ public class SysUi implements IXposedHookZygoteInit, IXposedHookInitPackageResou
     // ---- code hooks: keyboard-open back icon ----
     @Override
     public void handleLoadPackage(XC_LoadPackage.LoadPackageParam lp) {
-        XposedBridge.log(TAG + "BUILD v3 (volume + overscroll) loaded in " + lp.processName);
+        XposedBridge.log(TAG + "BUILD v4 (holo toast + dialogs + probes) loaded in " + lp.processName);
         hookEdge();                       // overscroll glow in whichever scoped app this is
         if (!PKG.equals(lp.packageName) || !lp.processName.equals(PKG)) return;
         // dumpNames(lp.classLoader);   // discovery only; re-enable if you need new names
@@ -106,6 +106,7 @@ public class SysUi implements IXposedHookZygoteInit, IXposedHookInitPackageResou
         hookClock(lp.classLoader);
         QsPanel.hookStatusBar(lp.classLoader);
         hookNavGlow(lp.classLoader);
+        try { Holo.hook(lp.classLoader); } catch (Throwable t) { XposedBridge.log(TAG + "Holo.hook failed: " + t); }
         Class<?> nav = null;
         String[] names = {
             "com.android.systemui.navigationbar.views.NavigationBarView",
@@ -220,6 +221,7 @@ public class SysUi implements IXposedHookZygoteInit, IXposedHookInitPackageResou
                             if (lockLogged.add(key)) XposedBridge.log(TAG + "lock clock view " + key + " id=" + tv.getId());
                         }
                         thin(tv);
+                        Holo.lockProbe(tv);
                     } catch (Throwable ignored) {}
                 }
             });
