@@ -92,17 +92,31 @@ public class LockRing extends View {
         return id == 0 ? null : root.findViewById(id);
     }
 
+    String lastWhy = "";
+
+    void why(String r) {
+        if (!r.equals(lastWhy)) { lastWhy = r; XposedBridge.log(TAG + "lockring state: " + r); }
+    }
+
     boolean lockScreenShowing() {
         Context c = getContext();
         KeyguardManager km = (KeyguardManager) c.getSystemService(Context.KEYGUARD_SERVICE);
         PowerManager pm = (PowerManager) c.getSystemService(Context.POWER_SERVICE);
-        if (km == null || !km.isKeyguardLocked() || pm == null || !pm.isInteractive()) return false;
-        View kr = byName("keyguard_root_view");
-        if (kr != null && (!kr.isShown() || kr.getAlpha() < 0.9f)) return false;
+        if (km == null || !km.isKeyguardLocked()) { why("hidden: keyguard not locked"); return false; }
+        if (pm == null || !pm.isInteractive()) { why("hidden: screen not interactive"); return false; }
         View st = byName("keyguard_status_view");
-        if (st != null && (!st.isShown() || st.getAlpha() < 0.9f)) return false;       // fades out when the shade is pulled
+        if (st == null) { why("hidden: keyguard_status_view not found"); return false; }
+        if (!st.isShown()) { why("hidden: status view not shown"); return false; }
+        if (st.getAlpha() < 0.9f) { why("hidden: status view alpha " + st.getAlpha()); return false; }
         View bouncer = byName("keyguard_bouncer_container");
-        if (bouncer instanceof ViewGroup && ((ViewGroup) bouncer).getChildCount() > 0) return false;
+        if (bouncer instanceof ViewGroup) {
+            ViewGroup g = (ViewGroup) bouncer;
+            for (int i = 0; i < g.getChildCount(); i++) {
+                View k = g.getChildAt(i);
+                if (k.isShown() && k.getAlpha() > 0.5f) { why("hidden: bouncer visible (" + k.getClass().getSimpleName() + ")"); return false; }
+            }
+        }
+        why("showing");
         return true;
     }
 
