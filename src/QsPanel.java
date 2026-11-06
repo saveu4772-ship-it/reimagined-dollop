@@ -234,8 +234,9 @@ public class QsPanel {
         head.addView(sp, new LinearLayout.LayoutParams(0, 1, 1f));
 
         ImageView list = new ImageView(c);
-        list.setImageDrawable(glyph(res, 4));
-        list.setPadding(dp(c, 8), dp(c, 8), dp(c, 8), dp(c, 8));
+        list.setImageDrawable(KkIcons.get(res, "qs_list"));
+        list.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        list.setPadding(dp(c, 6), dp(c, 6), dp(c, 6), dp(c, 6));
         list.setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) {
                 hide();
@@ -245,7 +246,7 @@ public class QsPanel {
                 } catch (Throwable t) { XposedBridge.log(TAG + "expand: " + t); }
             }
         });
-        head.addView(list, new LinearLayout.LayoutParams(dp(c, 44), dp(c, 44)));
+        head.addView(list, new LinearLayout.LayoutParams(dp(c, 48), dp(c, 48)));
         panel.addView(head, new LinearLayout.LayoutParams(-1, -2));
 
         // ---- 3x3 grid of dark flat tiles
@@ -262,7 +263,7 @@ public class QsPanel {
             @Override public void run() { cycleBrightness(); }
         }));
         final ImageView iSet = new ImageView(c); final TextView tSet = new TextView(c);
-        iSet.setImageDrawable(glyph(res, 1)); tSet.setText("SETTINGS");
+        iSet.setImageDrawable(KkIcons.get(res, "qs_gear")); tSet.setText("SETTINGS");
         row1.addView(tile(c, iSet, tSet, tileW, tileH, gap, new Runnable() {
             @Override public void run() { openSettings(Settings.ACTION_SETTINGS); }
         }));
@@ -368,7 +369,7 @@ public class QsPanel {
         } catch (Throwable t) { XposedBridge.log(TAG + "user: " + t); }
         try { // brightness
             int br = Settings.System.getInt(c.getContentResolver(), Settings.System.SCREEN_BRIGHTNESS, 128);
-            set(iBri, tBri, glyph(res, 0), (br * 100 / 255) + "%", true);
+            set(iBri, tBri, KkIcons.get(res, "qs_bri"), (br * 100 / 255) + "%", true);
         } catch (Throwable t) { XposedBridge.log(TAG + "bri: " + t); }
         try { // wifi
             android.net.wifi.WifiManager wm = (android.net.wifi.WifiManager) c.getSystemService(Context.WIFI_SERVICE);
@@ -414,7 +415,7 @@ public class QsPanel {
         try { // location
             android.location.LocationManager lm = (android.location.LocationManager) c.getSystemService(Context.LOCATION_SERVICE);
             boolean on = lm.isLocationEnabled();
-            set(iLoc, tLoc, glyph(res, 2), on ? "LOCATION" : "LOCATION OFF", on);
+            set(iLoc, tLoc, KkIcons.get(res, "qs_pin"), on ? "LOCATION" : "LOCATION OFF", on);
         } catch (Throwable t) { XposedBridge.log(TAG + "loc: " + t); }
         try { // next alarm
             android.app.AlarmManager am = (android.app.AlarmManager) c.getSystemService(Context.ALARM_SERVICE);
