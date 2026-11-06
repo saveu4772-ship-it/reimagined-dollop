@@ -5,14 +5,13 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.res.Resources;
-import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Paint;
-import android.graphics.Path;
 import android.graphics.PixelFormat;
-import android.graphics.RectF;
-import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
+import android.graphics.drawable.LayerDrawable;
+import android.graphics.drawable.ScaleDrawable;
+import android.graphics.drawable.StateListDrawable;
 import android.media.AudioManager;
 import android.os.Handler;
 import android.os.Looper;
@@ -21,32 +20,45 @@ import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowManager;
+import android.view.animation.AccelerateInterpolator;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.SeekBar;
+
+import java.util.ArrayList;
 
 import de.robv.android.xposed.XC_MethodReplacement;
 import de.robv.android.xposed.XposedBridge;
 import de.robv.android.xposed.XposedHelpers;
 
 /**
- * TechnoUI / KitKat style volume panel: a dark bar under the status bar with a big speaker icon,
- * a flat thick cyan slider with a round knob, and an expand chevron.
+ * Replica of TechnoUI's ICS volume panel (com.techno.honeycombui.ics.GbVolume): a dark rounded card
+ * 80dp below the top edge, min(480dp, screen) wide; holo seek bar per stream, divider and a
+ * "more volume controls" button that expands the other streams. Auto-hides after 3s (400ms fade).
+ * Artwork is TechnoUI's own (VolArt).
  */
 public class VolumePanel {
     static final String TAG = "[IcsVol] ";
-    static final int CYAN = 0xFF33B5E5;
-    static final int[] STREAMS = {AudioManager.STREAM_MUSIC, AudioManager.STREAM_RING, AudioManager.STREAM_ALARM};
     static final Handler H = new Handler(Looper.getMainLooper());
+    static final int[] ORDER = {0, 3, 2, 4};       // voice call, media, ring, alarm (same as TechnoUI)
 
-    static View root;
     static Context ctx;
     static AudioManager am;
-    static boolean expanded;
+    static LinearLayout root, sliders;
+    static ImageView more;
+    static View divider;
+    static final ArrayList<Row> rows = new ArrayList<Row>();
+    static boolean shown, fading, expanded;
+    static int active = -1;
     static BroadcastReceiver rcv;
-    static final LinearLayout[] rows = new LinearLayout[3];
-    static final FlatSlider[] bars = new FlatSlider[3];
-    static final ImageView[] arrows = new ImageView[3];
-    static final Runnable AUTO = new Runnable() { @Override public void run() { hide(); } };
+    static final Runnable HIDE = new Runnable() { @Override public void run() { hide(); } };
+
+    static class Row {
+        int stream;
+        LinearLayout group;
+        ImageView icon;
+        SeekBar bar;
+    }
 
     // ---------------------------------------------------------------- hook
     static void hook(ClassLoader cl) {
@@ -133,52 +145,85 @@ public class VolumePanel {
         XposedBridge.log(TAG + "show requested");
         H.post(new Runnable() {
             @Override public void run() {
-                try {
-                    ctx = c;
-                    am = (AudioManager) c.getSystemService(Context.AUDIO_SERVICE);
-                    if (root == null) {
-                        root = build(c);
-                        WindowManager.LayoutParams lp = new WindowManager.LayoutParams(
-                                -1, -2, 2038 /* TYPE_APPLICATION_OVERLAY */,
-                                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
-                                        | WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL
-                                        | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
-                                PixelFormat.TRANSLUCENT);
-                        lp.gravity = Gravity.TOP;
-                        lp.y = statusBarHeight(c);               // sits directly under the status bar
-                        ((WindowManager) c.getSystemService(Context.WINDOW_SERVICE)).addView(root, lp);
-                        register(c);
-                        root.setAlpha(0f);
-                        root.animate().alpha(1f).setDuration(120).start();
-                    }
-                    refresh();
-                    H.removeCallbacks(AUTO);
-                    H.postDelayed(AUTO, 3000);
-                } catch (Throwable t) { XposedBridge.log(TAG + "show failed: " + t); root = null; }
+                try { showNow(c); } catch (Throwable t) { XposedBridge.log(TAG + "show failed: " + t); }
             }
         });
     }
 
-    static void hide() {
-        final View r = root;
-        if (r == null) return;
-        root = null;
-        expanded = false;
-        H.removeCallbacks(AUTO);
-        try { if (rcv != null) ctx.unregisterReceiver(rcv); } catch (Throwable ignored) {}
-        rcv = null;
-        final Context c = ctx;
-        r.animate().alpha(0f).setDuration(120).withEndAction(new Runnable() {
-            @Override public void run() {
-                try { ((WindowManager) c.getSystemService(Context.WINDOW_SERVICE)).removeView(r); }
-                catch (Throwable ignored) {}
+    static void showNow(Context c) {
+        ctx = c;
+        am = (AudioManager) c.getSystemService(Context.AUDIO_SERVICE);
+        WindowManager wm = (WindowManager) c.getSystemService(Context.WINDOW_SERVICE);
+        if (root == null) build(c);
+        if (fading) {                                   // came back while fading out
+            fading = false;
+            root.animate().cancel();
+            root.setAlpha(1f);
+        }
+        int want = pickStream();
+        if (!shown) {
+            active = want;
+            expanded = false;
+            reorder();
+            try {
+                wm.addView(root, params(c));
+                shown = true;
+            } catch (RuntimeException e) {
+                XposedBridge.log(TAG + "addView: " + e);
+                return;
             }
-        }).start();
+            register(c);
+        } else if (want != active && !expanded) {
+            active = want;
+            reorder();
+        }
+        refresh();
+        resetTimer();
+    }
+
+    static void hide() {
+        H.removeCallbacks(HIDE);
+        if (!shown || fading || root == null) return;
+        fading = true;
+        root.animate().alpha(0f).setDuration(400).setInterpolator(new AccelerateInterpolator(1f))
+                .withEndAction(new Runnable() { @Override public void run() { finish(); } }).start();
+    }
+
+    static void finish() {
+        if (!fading) return;
+        fading = false;
+        shown = false;
+        try { ((WindowManager) ctx.getSystemService(Context.WINDOW_SERVICE)).removeView(root); }
+        catch (RuntimeException ignored) {}
+        root.setAlpha(1f);
+        try { if (rcv != null) ctx.unregisterReceiver(rcv); } catch (RuntimeException ignored) {}
+        rcv = null;
+    }
+
+    static void resetTimer() {
+        H.removeCallbacks(HIDE);
+        H.postDelayed(HIDE, 3000);
+    }
+
+    static WindowManager.LayoutParams params(Context c) {
+        int w = Math.min(dp(c, 480), c.getResources().getDisplayMetrics().widthPixels);
+        WindowManager.LayoutParams lp = new WindowManager.LayoutParams(
+                w, -2, 2038 /* TYPE_APPLICATION_OVERLAY (TechnoUI uses accessibility overlay 2032) */,
+                0x40228 /* NOT_FOCUSABLE | NOT_TOUCH_MODAL | LAYOUT_NO_LIMITS | WATCH_OUTSIDE_TOUCH */,
+                PixelFormat.TRANSLUCENT);
+        lp.gravity = Gravity.TOP | Gravity.CENTER_HORIZONTAL;   // 0x31
+        lp.y = dp(c, 80);
+        lp.setTitle("TechnoUIVolume");
+        return lp;
     }
 
     static void register(Context c) {
         rcv = new BroadcastReceiver() {
-            @Override public void onReceive(Context context, Intent i) { if (root != null) refresh(); }
+            @Override public void onReceive(Context context, Intent i) {
+                if (!shown) return;
+                refresh();
+                if (!expanded) resetTimer();
+            }
         };
         IntentFilter f = new IntentFilter();
         f.addAction("android.media.VOLUME_CHANGED_ACTION");
@@ -186,160 +231,198 @@ public class VolumePanel {
         try { c.registerReceiver(rcv, f); } catch (Throwable t) { XposedBridge.log(TAG + "receiver: " + t); }
     }
 
+    /** same rules as TechnoUI: in call -> voice, else media if playing, else ring (phones) / media */
+    static int pickStream() {
+        int mode = am.getMode();
+        if (mode == AudioManager.MODE_IN_CALL || mode == AudioManager.MODE_IN_COMMUNICATION) return 0;
+        if (am.isMusicActive()) return 3;
+        return ctx.getPackageManager().hasSystemFeature("android.hardware.telephony") ? 2 : 3;
+    }
+
     // ---------------------------------------------------------------- UI
     static int dp(Context c, float v) {
-        return (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, v, c.getResources().getDisplayMetrics());
+        return (int) (TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, v, c.getResources().getDisplayMetrics()) + 0.5f);
     }
 
-    static int statusBarHeight(Context c) {
-        Resources r = c.getResources();
-        int id = r.getIdentifier("status_bar_height", "dimen", "android");
-        return id > 0 ? r.getDimensionPixelSize(id) : dp(c, 24);
+    static void build(final Context c) {
+        Resources res = c.getResources();
+        root = new LinearLayout(c);
+        root.setOrientation(LinearLayout.HORIZONTAL);
+        try { root.setBackground(VolArt.nine(res, "dialog")); } catch (Throwable t) { XposedBridge.log(TAG + "bg: " + t); root.setBackgroundColor(0xE6262626); }
+        root.setOnTouchListener(new View.OnTouchListener() {
+            @Override public boolean onTouch(View v, MotionEvent e) {
+                if (e.getAction() == MotionEvent.ACTION_OUTSIDE) hide(); else resetTimer();
+                return false;
+            }
+        });
+
+        sliders = new LinearLayout(c);
+        sliders.setOrientation(LinearLayout.VERTICAL);
+        root.addView(sliders, new LinearLayout.LayoutParams(0, -2, 1f));
+
+        divider = new View(c);
+        divider.setBackgroundColor(0x13FFFFFF);          // the 1px divider_vertical_dark pixel
+        LinearLayout.LayoutParams dlp = new LinearLayout.LayoutParams(
+                Math.max(1, Math.round(res.getDisplayMetrics().density / 1.5f)), dp(c, 32));
+        dlp.topMargin = dp(c, 16);
+        dlp.bottomMargin = dp(c, 16);
+        root.addView(divider, dlp);
+
+        more = new ImageView(c);
+        more.setImageDrawable(VolArt.get(res, "more"));
+        more.setPadding(dp(c, 16), dp(c, 16), dp(c, 16), dp(c, 16));
+        more.setScaleType(ImageView.ScaleType.CENTER);
+        more.setContentDescription("More volume controls");
+        more.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) { expand(); resetTimer(); }
+        });
+        LinearLayout.LayoutParams mlp = new LinearLayout.LayoutParams(-2, -2);
+        mlp.gravity = Gravity.TOP;                        // 0x30
+        root.addView(more, mlp);
+
+        rows.clear();
+        for (int s : ORDER) rows.add(makeRow(c, s));
     }
 
-    static void bump() { H.removeCallbacks(AUTO); H.postDelayed(AUTO, 3000); }
+    static Row makeRow(final Context c, final int stream) {
+        final Row r = new Row();
+        r.stream = stream;
+        r.group = new LinearLayout(c);
+        r.group.setOrientation(LinearLayout.HORIZONTAL);
+        r.group.setGravity(0x13);                         // CENTER_VERTICAL | LEFT
 
-    static View build(final Context c) {
-        LinearLayout panel = new LinearLayout(c);
-        panel.setOrientation(LinearLayout.VERTICAL);
-        panel.setBackgroundColor(0xFF121418);
-        panel.setClickable(true);
-        for (int i = 0; i < 3; i++) {
-            final int idx = i;
-            LinearLayout row = new LinearLayout(c);
-            row.setOrientation(LinearLayout.HORIZONTAL);
-            row.setGravity(Gravity.CENTER_VERTICAL);
+        r.icon = new ImageView(c);
+        r.icon.setPadding(dp(c, 16), dp(c, 16), dp(c, 16), dp(c, 16));
+        r.group.addView(r.icon, new LinearLayout.LayoutParams(-2, -2));
 
-            ImageView ic = new ImageView(c);
-            ic.setImageDrawable(icon(c, i));
-            ic.setScaleType(ImageView.ScaleType.FIT_CENTER);
-            ic.setPadding(dp(c, 12), dp(c, 8), dp(c, 10), dp(c, 8));
-            row.addView(ic, new LinearLayout.LayoutParams(dp(c, 59), dp(c, 45)));
+        r.bar = new HoloSeekBar(c);
+        r.bar.setPadding(dp(c, 16), dp(c, 16), dp(c, 16), dp(c, 16));
+        styleBar(c, r.bar);
+        r.bar.setMax(am.getStreamMaxVolume(stream));
+        r.bar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override public void onProgressChanged(SeekBar b, int p, boolean fromUser) {
+                if (!fromUser) return;
+                try { am.setStreamVolume(stream, p, 0); } catch (Throwable t) { XposedBridge.log(TAG + "set: " + t); }
+                updateIcon(r);
+                resetTimer();
+            }
+            @Override public void onStartTrackingTouch(SeekBar b) { resetTimer(); }
+            @Override public void onStopTrackingTouch(SeekBar b) {
+                try { am.setStreamVolume(stream, b.getProgress(), AudioManager.FLAG_PLAY_SOUND); } catch (Throwable ignored) {}
+                resetTimer();
+            }
+        });
+        LinearLayout.LayoutParams blp = new LinearLayout.LayoutParams(0, -2, 1f);
+        blp.rightMargin = dp(c, 16);
+        r.group.addView(r.bar, blp);
+        r.group.setLayoutParams(new LinearLayout.LayoutParams(-1, dp(c, 68)));
+        return r;
+    }
 
-            FlatSlider fs = new FlatSlider(c);
-            fs.cb = new FlatSlider.OnChange() {
-                @Override public void onChange(int v) {
-                    try { am.setStreamVolume(STREAMS[idx], v, 0); } catch (Throwable t) { XposedBridge.log(TAG + "set: " + t); }
-                    bump();
-                }
-            };
-            row.addView(fs, new LinearLayout.LayoutParams(0, dp(c, 45), 1f));
-            bars[i] = fs;
+    /** gbvol_scrubber_progress (track + scaled primary) and gbvol_scrubber_control (pressed / normal) */
+    static void styleBar(Context c, SeekBar bar) {
+        Resources res = c.getResources();
+        try {
+            Drawable track = VolArt.nine(res, "track");
+            Drawable prim = new ScaleDrawable(VolArt.nine(res, "primary"), Gravity.LEFT, 1f, -1f);
+            LayerDrawable ld = new LayerDrawable(new Drawable[]{track, prim});
+            ld.setId(0, android.R.id.background);
+            ld.setId(1, android.R.id.progress);
+            bar.setProgressDrawable(ld);
+        } catch (Throwable t) { XposedBridge.log(TAG + "progress drawable: " + t); }
+        StateListDrawable thumb = new StateListDrawable();
+        thumb.addState(new int[]{android.R.attr.state_pressed}, VolArt.get(res, "thumb_pressed"));
+        thumb.addState(new int[]{}, VolArt.get(res, "thumb"));
+        bar.setThumb(thumb);
+        // the theme's Material tints would recolour TechnoUI's art
+        try {
+            bar.setThumbTintList(null);
+            bar.setProgressTintList(null);
+            bar.setProgressBackgroundTintList(null);
+            bar.setSecondaryProgressTintList(null);
+            bar.setSplitTrack(false);
+        } catch (Throwable ignored) {}
+        bar.setThumbOffset(dp(c, 16));
+        bar.setMinimumHeight(dp(c, 13));
+        bar.setFocusable(true);
+    }
 
-            ImageView ar = new ImageView(c);
-            ar.setImageDrawable(arrow(c));
-            ar.setScaleType(ImageView.ScaleType.CENTER);
-            ar.setOnClickListener(new View.OnClickListener() {
-                @Override public void onClick(View v) { expanded = !expanded; refresh(); bump(); }
-            });
-            row.addView(ar, new LinearLayout.LayoutParams(dp(c, 60), dp(c, 45)));
-            arrows[i] = ar;
+    /** TechnoUI's HoloSeekBar: paints a 3dp cyan strip from the left edge to the thumb centre */
+    static class HoloSeekBar extends SeekBar {
+        final Paint fill = new Paint();
+        HoloSeekBar(Context c) { super(c); fill.setColor(0xFF33B5E5); }
 
-            rows[i] = row;
-            panel.addView(row, new LinearLayout.LayoutParams(-1, dp(c, 45)));
+        @Override protected synchronized void onDraw(Canvas cv) {
+            Drawable th = getThumb();
+            if (th != null && isEnabled()) {
+                float d = getResources().getDisplayMetrics().density;
+                int cx = getPaddingLeft() - getThumbOffset() + th.getBounds().centerX();
+                int cy = getPaddingTop() + th.getBounds().centerY();
+                float h = Math.max(1f, d * 1.5f);
+                if (cx > getPaddingLeft()) cv.drawRect(getPaddingLeft(), cy - h, cx, cy + h, fill);
+            }
+            super.onDraw(cv);
         }
-        View line = new View(c);
-        line.setBackgroundColor(0x44FFFFFF);
-        panel.addView(line, new LinearLayout.LayoutParams(-1, Math.max(1, dp(c, 0.5f))));
-        return panel;
+    }
+
+    // ---------------------------------------------------------------- state
+    static Row find(int stream) {
+        for (Row r : rows) if (r.stream == stream) return r;
+        return null;
+    }
+
+    /** active stream first, then the others (voice call only when it is the active one) */
+    static void reorder() {
+        sliders.removeAllViews();
+        Row a = find(active);
+        if (a != null) sliders.addView(a.group);
+        for (Row r : rows) {
+            if (r == a || r.stream == 0) continue;
+            sliders.addView(r.group);
+        }
+        for (Row r : rows) r.bar.setMax(am.getStreamMaxVolume(r.stream));
+        collapse();
+    }
+
+    static void collapse() {
+        expanded = false;
+        more.setVisibility(View.VISIBLE);
+        divider.setVisibility(View.VISIBLE);
+        View first = sliders.getChildAt(0);
+        if (first != null) { first.setVisibility(View.VISIBLE); first.setAlpha(1f); }
+        for (int i = 1; i < sliders.getChildCount(); i++) sliders.getChildAt(i).setVisibility(View.GONE);
+    }
+
+    static void expand() {
+        expanded = true;
+        for (int i = 0; i < sliders.getChildCount(); i++) sliders.getChildAt(i).setVisibility(View.VISIBLE);
+        more.setVisibility(View.INVISIBLE);
+        divider.setVisibility(View.INVISIBLE);
+        refresh();
     }
 
     static void refresh() {
         if (am == null) return;
-        int primary = am.isMusicActive() ? 0 : 1;
-        for (int i = 0; i < 3; i++) {
-            try { bars[i].set(am.getStreamMaxVolume(STREAMS[i]), am.getStreamVolume(STREAMS[i])); }
-            catch (Throwable ignored) {}
-            rows[i].setVisibility(expanded || i == primary ? View.VISIBLE : View.GONE);
-            arrows[i].setVisibility(i == primary ? View.VISIBLE : View.INVISIBLE);
-            arrows[i].setRotation(expanded ? 180 : 0);
+        for (Row r : rows) {
+            try { r.bar.setProgress(am.getStreamVolume(r.stream)); } catch (Throwable ignored) {}
+            updateIcon(r);
         }
     }
 
-    /** Flat, thick slider like TechnoUI: gray track, cyan fill, round cyan knob. */
-    static class FlatSlider extends View {
-        interface OnChange { void onChange(int v); }
-        OnChange cb;
-        int max = 15, progress;
-        final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
-        final float d;
-
-        FlatSlider(Context c) { super(c); d = c.getResources().getDisplayMetrics().density; }
-
-        void set(int m, int v) { max = Math.max(1, m); progress = v; invalidate(); }
-
-        @Override protected void onDraw(Canvas cv) {
-            float w = getWidth(), h = getHeight();
-            float bh = 24 * d, top = (h - bh) / 2f;
-            float x = w * progress / (float) max;
-            p.setColor(0xFF666666);
-            cv.drawRect(0, top, w, top + bh, p);
-            p.setColor(CYAN);
-            cv.drawRect(0, top, x, top + bh, p);
-            float r = bh * 0.36f;
-            cv.drawCircle(Math.min(Math.max(x, r), w - r), h / 2f, r, p);
+    static void updateIcon(Row r) {
+        String k;
+        int vol = 0;
+        try { vol = am.getStreamVolume(r.stream); } catch (Throwable ignored) {}
+        switch (r.stream) {
+            case 0:  k = "phone"; break;
+            case 4:  k = vol == 0 ? "alarm_mute" : "alarm"; break;
+            case 2:
+                int rm = am.getRingerMode();
+                k = rm == AudioManager.RINGER_MODE_VIBRATE ? "ring_vib"
+                        : (rm == AudioManager.RINGER_MODE_SILENT || vol == 0) ? "ring_mute" : "ring";
+                break;
+            default: k = vol == 0 ? "vol_mute" : "vol";
         }
-
-        @Override public boolean onTouchEvent(MotionEvent e) {
-            int a = e.getActionMasked();
-            if (a == MotionEvent.ACTION_DOWN) getParent().requestDisallowInterceptTouchEvent(true);
-            if (a == MotionEvent.ACTION_DOWN || a == MotionEvent.ACTION_MOVE) {
-                int v = Math.round(Math.max(0f, Math.min(1f, e.getX() / Math.max(1, getWidth()))) * max);
-                if (v != progress) { progress = v; invalidate(); if (cb != null) cb.onChange(v); }
-            }
-            if (a == MotionEvent.ACTION_UP || a == MotionEvent.ACTION_CANCEL) bump();
-            return true;
-        }
-    }
-
-    // ---------------------------------------------------------------- icons
-    static Drawable arrow(Context c) {
-        int s = 96;
-        Bitmap b = Bitmap.createBitmap(s, s, Bitmap.Config.ARGB_8888);
-        Canvas cv = new Canvas(b);
-        Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
-        p.setColor(0xFFFFFFFF); p.setStyle(Paint.Style.STROKE); p.setStrokeWidth(9);
-        p.setStrokeCap(Paint.Cap.SQUARE);
-        Path pa = new Path();
-        pa.moveTo(22, 34); pa.lineTo(48, 62); pa.lineTo(74, 34);
-        cv.drawPath(pa, p);
-        return new BitmapDrawable(c.getResources(), b);
-    }
-
-    /** 0 = speaker (media), 1 = bell (ring), 2 = alarm clock */
-    static Drawable icon(Context c, int kind) {
-        int s = 96;
-        Bitmap b = Bitmap.createBitmap(s, s, Bitmap.Config.ARGB_8888);
-        Canvas cv = new Canvas(b);
-        Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
-        p.setColor(0xFFFFFFFF);
-        if (kind == 0) {
-            p.setStyle(Paint.Style.FILL);
-            Path sp = new Path();
-            sp.moveTo(6, 36); sp.lineTo(26, 36); sp.lineTo(52, 12); sp.lineTo(52, 84);
-            sp.lineTo(26, 60); sp.lineTo(6, 60); sp.close();
-            cv.drawPath(sp, p);
-            p.setStyle(Paint.Style.STROKE); p.setStrokeWidth(8); p.setStrokeCap(Paint.Cap.ROUND);
-            cv.drawArc(new RectF(40, 30, 76, 66), -55, 110, false, p);
-            cv.drawArc(new RectF(34, 16, 92, 80), -55, 110, false, p);
-        } else if (kind == 1) {
-            p.setStyle(Paint.Style.FILL);
-            Path bp = new Path();
-            bp.moveTo(48, 12);
-            bp.cubicTo(28, 12, 24, 30, 24, 46);
-            bp.lineTo(24, 58); bp.lineTo(14, 68); bp.lineTo(82, 68); bp.lineTo(72, 58);
-            bp.lineTo(72, 46); bp.cubicTo(72, 30, 68, 12, 48, 12);
-            cv.drawPath(bp, p);
-            cv.drawCircle(48, 78, 8, p);
-        } else {
-            p.setStyle(Paint.Style.STROKE); p.setStrokeWidth(8);
-            cv.drawCircle(48, 52, 28, p);
-            cv.drawLine(48, 52, 48, 36, p);
-            cv.drawLine(48, 52, 60, 58, p);
-            p.setStyle(Paint.Style.FILL);
-            cv.drawCircle(22, 22, 10, p);
-            cv.drawCircle(74, 22, 10, p);
-        }
-        return new BitmapDrawable(c.getResources(), b);
+        r.icon.setImageDrawable(VolArt.get(ctx.getResources(), k));
     }
 }
