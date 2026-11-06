@@ -148,7 +148,7 @@ public class SysUi implements IXposedHookInitPackageResources, IXposedHookLoadPa
                 }
             };
             String[] ms = {"onBatteryLevelChanged", "updateDrawable", "onPowerSaveChanged",
-                    "updateColors", "setColorsFromContext", "onBatteryUnknownStateChanged",
+                    "updateColors", "setColorsFromContext", "updatePercentText", "updateShowPercent", "onBatteryUnknownStateChanged",
                     "scaleBatteryMeterViews"};
             for (String m : ms) {
                 int n = XposedBridge.hookAllMethods(c, m, h).size();
@@ -163,6 +163,10 @@ public class SysUi implements IXposedHookInitPackageResources, IXposedHookLoadPa
             int level = XposedHelpers.getIntField(bmv, "mLevel");
             boolean charging = false;
             try { charging = XposedHelpers.getBooleanField(bmv, "mPluggedIn"); } catch (Throwable ignored) {}
+            try {
+                Object pv = XposedHelpers.getObjectField(bmv, "mBatteryPercentView");
+                if (pv instanceof TextView) ((TextView) pv).setTypeface(IcsFont.get(((TextView) pv).getContext()));
+            } catch (Throwable ignored) {}
             Drawable d = KkIcons.battery(iv.getResources(), level, charging);
             if (d != null) {
                 iv.setImageTintList(null);
@@ -208,6 +212,26 @@ public class SysUi implements IXposedHookInitPackageResources, IXposedHookLoadPa
                     } catch (Throwable t) { XposedBridge.log(TAG + "clock hook failed: " + t); }
                 }
             });
+            XposedBridge.hookAllMethods(clock, "getSmallTime", new XC_MethodHook() {
+                @Override protected void afterHookedMethod(MethodHookParam param) {
+                    try {
+                        TextView c = (TextView) param.thisObject;
+                        if (c.getTag(KEY_MOVED) == null) return;           // main status bar clock only
+                        if (android.text.format.DateFormat.is24HourFormat(c.getContext())) return;
+                        java.util.Calendar cal = java.util.Calendar.getInstance();
+                        int h = cal.get(java.util.Calendar.HOUR);
+                        if (h == 0) h = 12;
+                        String time = h + ":" + (cal.get(java.util.Calendar.MINUTE) < 10 ? "0" : "")
+                                + cal.get(java.util.Calendar.MINUTE);
+                        String ap = cal.get(java.util.Calendar.AM_PM) == java.util.Calendar.AM ? "AM" : "PM";
+                        android.text.SpannableStringBuilder sb = new android.text.SpannableStringBuilder(time + " " + ap);
+                        sb.setSpan(new android.text.style.RelativeSizeSpan(0.7f), time.length(), sb.length(),
+                                android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                        param.setResult(sb);
+                    } catch (Throwable t) { XposedBridge.log(TAG + "getSmallTime: " + t); }
+                }
+            });
+            XposedBridge.log(TAG + "hooked Clock.getSmallTime");
             XposedBridge.log(TAG + "hooked Clock.onAttachedToWindow");
         } catch (Throwable t) { XposedBridge.log(TAG + "clock hook failed: " + t); }
     }
@@ -244,6 +268,7 @@ public class SysUi implements IXposedHookInitPackageResources, IXposedHookLoadPa
             c.setGravity(android.view.Gravity.CENTER_VERTICAL);
             ((LinearLayout) sys).addView(c, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.MATCH_PARENT));
+            try { XposedHelpers.callMethod(c, "updateClock"); } catch (Throwable ignored) {}
             XposedBridge.log(TAG + "clock moved to system_icons (right)");
         } catch (Throwable t) { XposedBridge.log(TAG + "moveRight failed: " + t); }
     }
