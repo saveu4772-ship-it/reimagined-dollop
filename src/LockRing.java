@@ -314,24 +314,27 @@ public class LockRing extends View {
         try {
             suppressUntil = android.os.SystemClock.uptimeMillis() + 2500;
             setVisibility(View.GONE);
-            final View r = root;
-            final float x = r.getWidth() / 2f;
-            final float y0 = r.getHeight() - 36 * u, y1 = r.getHeight() * 0.30f;
-            final long t0 = android.os.SystemClock.uptimeMillis();
-            final int steps = 12;
-            sendTouch(r, MotionEvent.ACTION_DOWN, t0, t0, x, y0);
-            for (int i = 1; i <= steps; i++) {
-                final int kk = i;
-                h.postDelayed(new Runnable() {
-                    @Override public void run() {
-                        long now = android.os.SystemClock.uptimeMillis();
-                        float y = y0 + (y1 - y0) * kk / steps;
-                        sendTouch(r, kk == steps ? MotionEvent.ACTION_UP : MotionEvent.ACTION_MOVE, t0, now, x, y);
-                    }
-                }, 16L * i);
-            }
+            swipeUp(root, h, u);
             XposedBridge.log(TAG + "lockring: swipe-up unlock");
         } catch (Throwable t) { XposedBridge.log(TAG + "lockring unlock failed: " + t); }
+    }
+
+    static void swipeUp(final View r, final Handler h, final float u) {
+        final float x = r.getWidth() / 2f;
+        final float y0 = r.getHeight() - 36 * u, y1 = r.getHeight() * 0.30f;
+        final long t0 = android.os.SystemClock.uptimeMillis();
+        final int steps = 12;
+        sendTouch(r, MotionEvent.ACTION_DOWN, t0, t0, x, y0);
+        for (int i = 1; i <= steps; i++) {
+            final int kk = i;
+            h.postDelayed(new Runnable() {
+                @Override public void run() {
+                    long now = android.os.SystemClock.uptimeMillis();
+                    float y = y0 + (y1 - y0) * kk / steps;
+                    sendTouch(r, kk == steps ? MotionEvent.ACTION_UP : MotionEvent.ACTION_MOVE, t0, now, x, y);
+                }
+            }, 16L * i);
+        }
     }
 
     static void sendTouch(View r, int action, long down, long now, float x, float y) {

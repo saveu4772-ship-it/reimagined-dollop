@@ -272,6 +272,7 @@ public class Holo {
                 p = p.getParent();
             }
             XposedBridge.log(TAG + "lockprobe chain: " + chain);
+            LockNotifs.attach(top);
             LockRing.attach(top);
             final View tv = top;
             top.postDelayed(new Runnable() { @Override public void run() { lockTextDump(tv); } }, 2500);

@@ -294,7 +294,10 @@ public class NotifPanel {
         } catch (Throwable t) { return null; }
     }
 
-    static View row(final Context c, final StatusBarNotification sbn) {
+    static View row(Context c, StatusBarNotification sbn) { return row(c, sbn, null, null, false); }
+
+    /** ovTitle/ovText replace the notification's own text (used to hide private content on the lock screen) */
+    static View row(final Context c, final StatusBarNotification sbn, CharSequence ovTitle, CharSequence ovText, boolean noBig) {
         final Notification n = sbn.getNotification();
         String pkg = sbn.getPackageName();
         int rowH = dp(c, 61);
@@ -308,6 +311,9 @@ public class NotifPanel {
             } catch (Throwable t) { title = pkg; }
         }
 
+        if (ovTitle != null) title = ovTitle;
+        if (ovText != null) text = ovText;
+
         LinearLayout item = new LinearLayout(c);
         item.setOrientation(LinearLayout.HORIZONTAL);
         item.setBackgroundColor(0xFF1A1A1A);
@@ -317,7 +323,7 @@ public class NotifPanel {
 
         // left square: large icon, or the small icon centred
         ImageView left = new ImageView(c);
-        Drawable big = load(n.getLargeIcon(), c, pkg);
+        Drawable big = noBig ? null : load(n.getLargeIcon(), c, pkg);
         Drawable small = load(n.getSmallIcon(), c, pkg);
         if (big != null) {
             left.setScaleType(ImageView.ScaleType.CENTER_CROP);
