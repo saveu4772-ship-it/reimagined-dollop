@@ -157,15 +157,16 @@ public class NotifPanel {
 
         LinearLayout panel = new LinearLayout(c);
         panel.setOrientation(LinearLayout.VERTICAL);
-        panel.setBackgroundColor(0xFF000000);
+        panel.setBackgroundColor(0xE6000000);
         panel.setClickable(true);
         panelView = panel;
-        r.addView(panel, new FrameLayout.LayoutParams(-1, -2));
+        r.addView(panel, new FrameLayout.LayoutParams(-1, -1));
 
         // header: clock + date, QS switch icon, clear-all icon
         LinearLayout head = new LinearLayout(c);
         head.setOrientation(LinearLayout.HORIZONTAL);
         head.setGravity(Gravity.BOTTOM);
+        head.setBackgroundColor(0xFF000000);
         head.setPadding(dp(c, 14), dp(c, 2), dp(c, 8), dp(c, 6));
 
         TextClock time = new TextClock(c);
@@ -213,13 +214,13 @@ public class NotifPanel {
         panel.addView(head, new LinearLayout.LayoutParams(-1, -2));
 
         // notification list (capped at ~70% of the screen height)
-        MaxScroll sv = new MaxScroll(c, (int) (H0 * 0.70f));
+        ScrollView sv = new ScrollView(c);
         sv.setVerticalScrollBarEnabled(false);
         sv.setOverScrollMode(View.OVER_SCROLL_NEVER);
         listBox = new LinearLayout(c);
         listBox.setOrientation(LinearLayout.VERTICAL);
         sv.addView(listBox, new ViewGroupLP());
-        panel.addView(sv, new LinearLayout.LayoutParams(-1, -2));
+        panel.addView(sv, new LinearLayout.LayoutParams(-1, 0, 1f));
 
         // carrier name bar
         carrierView = new TextView(c);

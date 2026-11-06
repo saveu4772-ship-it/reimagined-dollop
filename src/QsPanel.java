@@ -202,10 +202,10 @@ public class QsPanel {
 
         LinearLayout panel = new LinearLayout(c);
         panel.setOrientation(LinearLayout.VERTICAL);
-        panel.setBackgroundColor(0xFF000000);
+        panel.setBackgroundColor(0xCC000000);
         panel.setClickable(true);
         panelView = panel;
-        FrameLayout.LayoutParams plp = new FrameLayout.LayoutParams(-1, -2);
+        FrameLayout.LayoutParams plp = new FrameLayout.LayoutParams(-1, -1);
         plp.topMargin = 0;   // overlay is already inset below the status bar
         r.addView(panel, plp);
 
@@ -213,6 +213,7 @@ public class QsPanel {
         LinearLayout head = new LinearLayout(c);
         head.setOrientation(LinearLayout.HORIZONTAL);
         head.setGravity(Gravity.BOTTOM);
+        head.setBackgroundColor(0xFF000000);
         head.setPadding(dp(c, 14), dp(c, 2), dp(c, 14), dp(c, 6));
 
         TextClock time = new TextClock(c);
@@ -304,12 +305,15 @@ public class QsPanel {
         }));
         panel.addView(row4);
 
-        // thin handle line at the bottom
+        // filler that pushes the handle line to the bottom of the screen
+        FrameLayout filler = new FrameLayout(c);
         View line = new View(c);
         line.setBackgroundColor(0xFFC0C0C0);
-        LinearLayout.LayoutParams llp = new LinearLayout.LayoutParams(-1, dp(c, 2));
-        llp.setMargins(dp(c, 12), dp(c, 10), dp(c, 12), dp(c, 8));
-        panel.addView(line, llp);
+        FrameLayout.LayoutParams flp = new FrameLayout.LayoutParams(-1, dp(c, 3));
+        flp.gravity = Gravity.BOTTOM;
+        flp.setMargins(dp(c, 12), 0, dp(c, 12), dp(c, 12));
+        filler.addView(line, flp);
+        panel.addView(filler, new LinearLayout.LayoutParams(-1, 0, 1f));
         return r;
     }
 
