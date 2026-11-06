@@ -96,7 +96,7 @@ public class SysUi implements IXposedHookZygoteInit, IXposedHookInitPackageResou
     // ---- code hooks: keyboard-open back icon ----
     @Override
     public void handleLoadPackage(XC_LoadPackage.LoadPackageParam lp) {
-        XposedBridge.log(TAG + "BUILD v4.1 (holo toast + dialogs + power menu) loaded in " + lp.processName);
+        XposedBridge.log(TAG + "BUILD v4.2 (holo toast ctor + dialogs + power menu) loaded in " + lp.processName);
         hookEdge();                       // overscroll glow in whichever scoped app this is
         if (!PKG.equals(lp.packageName) || !lp.processName.equals(PKG)) return;
         // dumpNames(lp.classLoader);   // discovery only; re-enable if you need new names

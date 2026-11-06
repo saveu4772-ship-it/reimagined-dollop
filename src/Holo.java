@@ -45,6 +45,22 @@ public class Holo {
             StringBuilder ms = new StringBuilder();
             for (java.lang.reflect.Method m : c.getDeclaredMethods()) ms.append(m.getName()).append(' ');
             XposedBridge.log(TAG + "toast: methods in " + n + ": " + ms);
+            if (n.endsWith("SystemUIToast")) {
+                try {
+                    total += XposedBridge.hookAllConstructors(c, new XC_MethodHook() {
+                        @Override protected void afterHookedMethod(MethodHookParam p) {
+                            try {
+                                Object v = null;
+                                try { v = XposedHelpers.getObjectField(p.thisObject, "mToastView"); } catch (Throwable ignored) {}
+                                if (v == null) v = XposedHelpers.callMethod(p.thisObject, "getView");
+                                XposedBridge.log(TAG + "toast ctor view=" + (v == null ? "null" : v.getClass().getSimpleName()));
+                                if (v instanceof View) skinToast((View) v);
+                            } catch (Throwable t) { XposedBridge.log(TAG + "toast ctor: " + t); }
+                        }
+                    }).size();
+                    XposedBridge.log(TAG + "toast ctor hooked");
+                } catch (Throwable t) { XposedBridge.log(TAG + "toast ctor hook failed: " + t); }
+            }
             try {
                 total += XposedBridge.hookAllMethods(c, "getView", new XC_MethodHook() {
                     @Override protected void afterHookedMethod(MethodHookParam p) {
