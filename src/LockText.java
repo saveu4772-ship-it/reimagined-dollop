@@ -74,30 +74,50 @@ public class LockText {
         synchronized (logged) { if (logged.add(what)) XposedBridge.log(TAG + "locktext styled " + what + " (" + cn + ")"); }
     }
 
-    /** zero the corner radius of notification card backgrounds */
+    /** zero the corner radius of notification card backgrounds: v6.3 squares the background shape right before it draws */
     static void squareCards(ClassLoader cl) {
         Class<?> c = XposedHelpers.findClassIfExists("com.android.systemui.statusbar.notification.row.NotificationBackgroundView", cl);
         if (c == null) { XposedBridge.log(TAG + "cards: NotificationBackgroundView not found"); return; }
-        int n = 0;
         StringBuilder names = new StringBuilder();
-        for (Method m : c.getDeclaredMethods()) {
-            String nm = m.getName().toLowerCase();
-            if (!(nm.contains("radius") || nm.contains("roundness"))) continue;
-            Class<?>[] pt = m.getParameterTypes();
-            if (pt.length == 0) continue;
-            boolean allFloat = true;
-            for (Class<?> x : pt) if (x != float.class) allFloat = false;
-            names.append(m.getName()).append('/').append(pt.length).append(allFloat ? "f " : " ");
-            if (!allFloat) continue;
+        for (Method m : c.getDeclaredMethods()) names.append(m.getName()).append(' ');
+        XposedBridge.log(TAG + "cards: methods " + names);
+        StringBuilder fields = new StringBuilder();
+        for (java.lang.reflect.Field f : c.getDeclaredFields()) fields.append(f.getName()).append(':').append(f.getType().getSimpleName()).append(' ');
+        XposedBridge.log(TAG + "cards: fields " + fields);
+        int n = 0;
+        String[] draws = {"draw", "onDraw", "dispatchDraw"};
+        for (String d : draws) {
             try {
-                XposedBridge.hookMethod(m, new XC_MethodHook() {
+                n += XposedBridge.hookAllMethods(c, d, new XC_MethodHook() {
                     @Override protected void beforeHookedMethod(MethodHookParam p) {
-                        for (int i = 0; i < p.args.length; i++) p.args[i] = 0f;
+                        try {
+                            Object bg = XposedHelpers.getObjectField(p.thisObject, "mBackground");
+                            if (bg instanceof android.graphics.drawable.Drawable) square((android.graphics.drawable.Drawable) bg, 0);
+                        } catch (Throwable t) { warn("cards draw: " + t); }
                     }
-                });
-                n++;
-            } catch (Throwable t) { XposedBridge.log(TAG + "cards hook " + m.getName() + ": " + t); }
+                }).size();
+            } catch (Throwable t) { XposedBridge.log(TAG + "cards hook " + d + ": " + t); }
         }
-        XposedBridge.log(TAG + "cards: radius methods " + names + "-> hooked " + n);
+        XposedBridge.log(TAG + "cards: draw hooks " + n);
+    }
+
+    static boolean warned;
+    static void warn(String s) { if (!warned) { warned = true; XposedBridge.log(TAG + s); } }
+
+    /** remove rounded corners from a (possibly layered/wrapped) background drawable, only if it still has any */
+    static void square(android.graphics.drawable.Drawable d, int depth) {
+        if (d == null || depth > 4) return;
+        if (d instanceof android.graphics.drawable.GradientDrawable) {
+            android.graphics.drawable.GradientDrawable g = (android.graphics.drawable.GradientDrawable) d;
+            boolean round = g.getCornerRadius() != 0f;
+            float[] r = g.getCornerRadii();
+            if (r != null) for (float v : r) if (v != 0f) round = true;
+            if (round) { g.setCornerRadii(new float[8]); g.setCornerRadius(0f); }
+        } else if (d instanceof android.graphics.drawable.LayerDrawable) {
+            android.graphics.drawable.LayerDrawable l = (android.graphics.drawable.LayerDrawable) d;
+            for (int i = 0; i < l.getNumberOfLayers(); i++) square(l.getDrawable(i), depth + 1);
+        } else if (d instanceof android.graphics.drawable.DrawableWrapper) {
+            square(((android.graphics.drawable.DrawableWrapper) d).getDrawable(), depth + 1);
+        }
     }
 }
