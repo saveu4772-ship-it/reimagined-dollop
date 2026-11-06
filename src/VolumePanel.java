@@ -51,23 +51,39 @@ public class VolumePanel {
     static void hook(ClassLoader cl) {
         String[] names = {
             "com.android.systemui.volume.VolumeDialogImpl",
-            "com.android.systemui.volume.OplusVolumeDialogImpl"
+            "com.android.systemui.volume.OplusVolumeDialogImpl",
+            "com.android.systemui.volume.VolumeDialogController",
+            "com.android.systemui.volume.VolumeDialogControllerImpl"
         };
+        int total = 0;
         for (String n : names) {
             Class<?> c = XposedHelpers.findClassIfExists(n, cl);
-            if (c == null) continue;
-            try {
-                int k = XposedBridge.hookAllMethods(c, "show", new XC_MethodReplacement() {
-                    @Override protected Object replaceHookedMethod(MethodHookParam p) {
-                        try { show(currentApp()); } catch (Throwable t) { XposedBridge.log(TAG + "show: " + t); }
-                        return null;
+            if (c == null) { XposedBridge.log(TAG + "no class " + n); continue; }
+            StringBuilder seen = new StringBuilder();
+            // walk the class hierarchy: show/showH may be declared in a parent
+            for (Class<?> k = c; k != null && k != Object.class; k = k.getSuperclass()) {
+                for (java.lang.reflect.Method m : k.getDeclaredMethods()) {
+                    String mn = m.getName();
+                    if (mn.toLowerCase().contains("show") || mn.toLowerCase().contains("dismiss"))
+                        seen.append(k.getSimpleName()).append('.').append(mn).append(' ');
+                    if (n.endsWith("Impl") && n.contains("Dialog") && !n.contains("Controller")
+                            && (mn.equals("show") || mn.equals("showH"))) {
+                        try {
+                            XposedBridge.hookMethod(m, new XC_MethodReplacement() {
+                                @Override protected Object replaceHookedMethod(MethodHookParam p) {
+                                    try { show(currentApp()); } catch (Throwable t) { XposedBridge.log(TAG + "show: " + t); }
+                                    return null;
+                                }
+                            });
+                            total++;
+                            XposedBridge.log(TAG + "hooked " + k.getName() + "." + mn);
+                        } catch (Throwable t) { XposedBridge.log(TAG + "hook failed " + mn + ": " + t); }
                     }
-                }).size();
-                XposedBridge.log(TAG + "hooked " + n + ".show x" + k);
-                if (k > 0) return;
-            } catch (Throwable t) { XposedBridge.log(TAG + "hook failed " + n + ": " + t); }
+                }
+            }
+            XposedBridge.log(TAG + "methods in " + n + ": " + seen);
         }
-        XposedBridge.log(TAG + "no volume dialog class hooked");
+        XposedBridge.log(TAG + (total == 0 ? "no volume dialog method hooked" : "volume hooks: " + total));
     }
 
     static Context currentApp() {
