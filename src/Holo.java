@@ -225,6 +225,7 @@ public class Holo {
                 p = p.getParent();
             }
             XposedBridge.log(TAG + "lockprobe chain: " + chain);
+            LockRing.attach(top);
             if (top instanceof ViewGroup) {
                 ViewGroup g = (ViewGroup) top;
                 StringBuilder sb = new StringBuilder();
