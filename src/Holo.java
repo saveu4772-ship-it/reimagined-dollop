@@ -29,6 +29,7 @@ public class Holo {
     static void hook(ClassLoader cl) {
         if (SKIN_TOAST) hookToast(cl);
         hookDialogs();
+        try { LockText.hook(cl); } catch (Throwable t) { XposedBridge.log(TAG + "LockText.hook failed: " + t); }
         try { PowerMenu.hook(cl); } catch (Throwable t) { XposedBridge.log(TAG + "PowerMenu.hook failed: " + t); }
     }
 
