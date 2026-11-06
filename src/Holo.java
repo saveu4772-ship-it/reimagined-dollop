@@ -29,6 +29,7 @@ public class Holo {
     static void hook(ClassLoader cl) {
         if (SKIN_TOAST) hookToast(cl);
         hookDialogs();
+        try { PowerMenu.hook(cl); } catch (Throwable t) { XposedBridge.log(TAG + "PowerMenu.hook failed: " + t); }
     }
 
     // ------------------------------------------------------------ toast
@@ -72,6 +73,16 @@ public class Holo {
     static void hookDialogs() {
         try {
             int n = XposedBridge.hookAllMethods(Dialog.class, "show", new XC_MethodHook() {
+                @Override protected void beforeHookedMethod(MethodHookParam p) {
+                    try {
+                        String cn = p.thisObject.getClass().getName();
+                        if (PowerMenu.looksLikePowerMenu(cn)) {
+                            XposedBridge.log(TAG + "power dialog intercepted: " + cn);
+                            PowerMenu.show();
+                            p.setResult(null);
+                        }
+                    } catch (Throwable t) { XposedBridge.log(TAG + "power intercept failed, stock used: " + t); }
+                }
                 @Override protected void afterHookedMethod(MethodHookParam p) {
                     try {
                         Dialog d = (Dialog) p.thisObject;
@@ -97,7 +108,7 @@ public class Holo {
 
     /** dialogs that draw their own full-screen / special UI and must not get a card background */
     static boolean skippable(String cn) {
-        return cn.contains("Keyguard") || cn.contains("Bouncer") || cn.contains("Volume")
+        return cn.startsWith("ics.recents") || cn.contains("Keyguard") || cn.contains("Bouncer") || cn.contains("Volume")
                 || cn.contains("Screenshot") || cn.contains("Biometric");
     }
 
