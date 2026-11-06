@@ -67,7 +67,7 @@ public class VolumePanel {
                     if (mn.toLowerCase().contains("show") || mn.toLowerCase().contains("dismiss"))
                         seen.append(k.getSimpleName()).append('.').append(mn).append(' ');
                     if (n.endsWith("Impl") && n.contains("Dialog") && !n.contains("Controller")
-                            && (mn.equals("show") || mn.equals("showH"))) {
+                            && (mn.equals("show") || mn.equals("showH") || mn.equals("-$$Nest$mshowH"))) {
                         try {
                             XposedBridge.hookMethod(m, new XC_MethodReplacement() {
                                 @Override protected Object replaceHookedMethod(MethodHookParam p) {
