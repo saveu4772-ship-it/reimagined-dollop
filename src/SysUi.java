@@ -36,6 +36,14 @@ public class SysUi implements IXposedHookInitPackageResources, IXposedHookLoadPa
         replace(p, "ic_sysbar_recent", 2);
         replace(p, "ic_sysbar_back_ime", 3);
         for (String[] m : KK) replaceKk(p, m[0], m[1]);
+        for (String n : new String[]{"stat_sys_ringer_silent", "stat_sys_ringer_silent_mute"}) {
+            try {
+                p.res.setReplacement(PKG, "drawable", n, new XResources.DrawableLoader() {
+                    @Override public Drawable newDrawable(XResources res, int id) { return KkExtra.silent(res); }
+                });
+                XposedBridge.log(TAG + "kk replaced " + n);
+            } catch (Throwable t) { XposedBridge.log(TAG + "kk skip " + n + ": " + t); }
+        }
     }
 
 
@@ -88,10 +96,11 @@ public class SysUi implements IXposedHookInitPackageResources, IXposedHookLoadPa
     @Override
     public void handleLoadPackage(XC_LoadPackage.LoadPackageParam lp) {
         if (!PKG.equals(lp.packageName) || !lp.processName.equals(PKG)) return;
-        dumpNames(lp.classLoader);
+        // dumpNames(lp.classLoader);   // discovery only; re-enable if you need new names
         hookBattery(lp.classLoader);
         hookClock(lp.classLoader);
         QsPanel.hookStatusBar(lp.classLoader);
+        hookNavGlow(lp.classLoader);
         Class<?> nav = null;
         String[] names = {
             "com.android.systemui.navigationbar.views.NavigationBarView",
@@ -136,6 +145,34 @@ public class SysUi implements IXposedHookInitPackageResources, IXposedHookLoadPa
         } catch (Throwable t) { XposedBridge.log(TAG + "hints hook failed: " + t); }
     }
 
+
+    // ---- KitKat nav button pressed glow ----
+    static void hookNavGlow(ClassLoader cl) {
+        String[] names = {
+            "com.android.systemui.navigationbar.buttons.KeyButtonView",
+            "com.android.systemui.navigationbar.views.buttons.KeyButtonView",
+            "com.android.systemui.statusbar.policy.KeyButtonView"
+        };
+        Class<?> k = null;
+        for (String n : names) {
+            k = XposedHelpers.findClassIfExists(n, cl);
+            if (k != null) { XposedBridge.log(TAG + "KeyButtonView " + n); break; }
+        }
+        if (k == null) { XposedBridge.log(TAG + "KeyButtonView not found"); return; }
+        try {
+            int n = XposedBridge.hookAllConstructors(k, new XC_MethodHook() {
+                @Override protected void afterHookedMethod(MethodHookParam param) {
+                    try {
+                        View v = (View) param.thisObject;
+                        boolean land = v.getResources().getConfiguration().orientation
+                                == android.content.res.Configuration.ORIENTATION_LANDSCAPE;
+                        v.setBackground(KkExtra.glow(v.getResources(), land));
+                    } catch (Throwable t) { XposedBridge.log(TAG + "glow: " + t); }
+                }
+            }).size();
+            XposedBridge.log(TAG + "hooked KeyButtonView ctors x" + n);
+        } catch (Throwable t) { XposedBridge.log(TAG + "glow hook failed: " + t); }
+    }
 
     // ---- KitKat battery: swap the icon image after SystemUI updates it ----
     static void hookBattery(ClassLoader cl) {
