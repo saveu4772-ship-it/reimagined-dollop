@@ -210,6 +210,52 @@ public class Holo {
         }
     }
 
+    static boolean textDumped;
+
+    /** one-time dump of what the lock screen really contains: every visible text and the first notification cards */
+    static void lockTextDump(View top) {
+        try {
+            if (textDumped) return;
+            textDumped = true;
+            StringBuilder sb = new StringBuilder();
+            int[] n = {0};
+            collectText(top, sb, n);
+            for (int i = 0; i < sb.length(); i += 700)
+                XposedBridge.log(TAG + "locktext " + sb.substring(i, Math.min(sb.length(), i + 700)));
+            java.util.ArrayList<View> rows = new java.util.ArrayList<View>();
+            findByClass(top, "ExpandableNotificationRow", rows, 2);
+            XposedBridge.log(TAG + "locktext rows found: " + rows.size());
+            for (int i = 0; i < rows.size(); i++) logTree("lockrow" + i, rows.get(i));
+        } catch (Throwable t) { XposedBridge.log(TAG + "lockTextDump: " + t); }
+    }
+
+    static void collectText(View v, StringBuilder sb, int[] n) {
+        if (n[0] > 60) return;
+        if (v instanceof TextView && v.isShown()) {
+            CharSequence t = ((TextView) v).getText();
+            if (t != null && t.length() > 0) {
+                n[0]++;
+                sb.append(idName(v)).append('#').append(v.getClass().getSimpleName()).append(" \"")
+                  .append(t.length() > 22 ? t.subSequence(0, 22) : t).append("\" ")
+                  .append((int) (((TextView) v).getTextSize() / v.getResources().getDisplayMetrics().scaledDensity)).append("sp")
+                  .append(" < ").append(v.getParent() instanceof View ? idName((View) v.getParent()) : "-").append(" | ");
+            }
+        }
+        if (v instanceof ViewGroup) {
+            ViewGroup g = (ViewGroup) v;
+            for (int i = 0; i < g.getChildCount(); i++) collectText(g.getChildAt(i), sb, n);
+        }
+    }
+
+    static void findByClass(View v, String simple, java.util.ArrayList<View> out, int max) {
+        if (out.size() >= max) return;
+        if (v.getClass().getSimpleName().equals(simple)) { out.add(v); return; }
+        if (v instanceof ViewGroup) {
+            ViewGroup g = (ViewGroup) v;
+            for (int i = 0; i < g.getChildCount(); i++) findByClass(g.getChildAt(i), simple, out, max);
+        }
+    }
+
     static final HashSet<String> lockProbed = new HashSet<String>();
 
     /** called when the lock screen clock attaches: log the view chain and the siblings along it (where a ring could live) */
@@ -226,6 +272,8 @@ public class Holo {
             }
             XposedBridge.log(TAG + "lockprobe chain: " + chain);
             LockRing.attach(top);
+            final View tv = top;
+            top.postDelayed(new Runnable() { @Override public void run() { lockTextDump(tv); } }, 2500);
             if (top instanceof ViewGroup) {
                 ViewGroup g = (ViewGroup) top;
                 StringBuilder sb = new StringBuilder();
