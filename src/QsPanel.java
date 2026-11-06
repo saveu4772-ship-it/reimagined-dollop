@@ -55,6 +55,7 @@ public class QsPanel {
     // swipe tracking
     static float downX, downY;
     static boolean armed, fired;
+    static int zone;   // 1 = left (notifications), 2 = right (quick settings)
 
     // tiles
     static ImageView iUser, iWifi, iSig, iBat, iAir, iBt, iLoc, iAlarm, iBri;
@@ -85,7 +86,9 @@ public class QsPanel {
         if (a == MotionEvent.ACTION_DOWN) {
             downX = ev.getX(); downY = ev.getY();
             fired = false;
-            armed = root == null && downX > v.getWidth() * 0.62f;   // right side only
+            zone = downX > v.getWidth() * 0.62f ? 2 : (downX < v.getWidth() * 0.38f ? 1 : 0);
+            armed = root == null && NotifPanel.root == null && zone != 0;
+            if (zone == 1) NotifPanel.ensureListener(v.getContext().getApplicationContext());
             return;
         }
         if (fired) {
@@ -105,7 +108,7 @@ public class QsPanel {
                 catch (Throwable ignored) {}
                 c.recycle();
                 p.setResult(true);
-                show(v.getContext());
+                if (zone == 1) NotifPanel.show(v.getContext()); else show(v.getContext());
             }
         } else if (a == MotionEvent.ACTION_UP || a == MotionEvent.ACTION_CANCEL) {
             armed = false;
@@ -240,10 +243,7 @@ public class QsPanel {
         list.setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) {
                 hide();
-                try {
-                    Object sbm = ctx.getSystemService("statusbar");
-                    XposedHelpers.callMethod(sbm, "expandNotificationsPanel");
-                } catch (Throwable t) { XposedBridge.log(TAG + "expand: " + t); }
+                NotifPanel.show(ctx);
             }
         });
         head.addView(list, new LinearLayout.LayoutParams(dp(c, 48), dp(c, 48)));

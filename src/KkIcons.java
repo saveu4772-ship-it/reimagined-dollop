@@ -804,6 +804,41 @@ public class KkIcons {
             "2/frBHtGyT116lTD87xHiOjvCPfLHBGxJ7/bICKsqv/O5XLvGWcXNULNFR1I6keou5AJApubPWoX5wJALpe7AODCFb+VWcIcie3x" +
             "OiQs4HKwo8dvrTBMTcIABqJJdXNj87LfF8v8oKqLqvq7IAg+DUTSbDsq12OBO2o+sQjVMH7q6Xw+371C6xeqLVvgewra2qaP1vd/" +
             "V+aGcXBtIrkAAAAASUVORK5CYII=");
+        D.put("clear",
+            "iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAMAAACdt4HsAAAA7VBMVEUAAAD/////////////////////////////////////////" +
+            "////////////////////////////////////////////////////////////////////////////////////////////////////" +
+            "////////////////////////////////////////////////////////////////////////////////////////////////////" +
+            "//////////////////////////////////////////////////////////////////////9sDJFPAAAAT3RSTlMAAgEIISAjDQMr" +
+            "uby7yUswzNHP0M3fUy/IysvaUdtS0uFUDDY3OxYtKicHZ9fHzmjZaWbVxbgfEiUiBQSUiIqJi1jr3cYyM1bm09bYfH6A5F5PTgAA" +
+            "AShJREFUWMPt1+lSwjAQB/BttVgKkbRUTS9QWvEqiFZRVAQP8Pb9H0deYLMdmeA4k9/nzD+ZbnfTAmgazZAyVW9vwtq6hFXZAPkZ" +
+            "bKg6tTrKYZuLJfKABne9Jsbf2iYDdgQPQoyIYjqA+SHHsKSlA8oELFuFhtd22xhvd48IMKGTZrh0vwvq28mWUrK/KbeCGdY9OKzi" +
+            "jo6J527ASd4LMKzvWIsl8oDTKPAx3K2VCBgw9OUPm3UdsJKAs2XLeF5cCEyPXw6JAICr6xGuMrxR30x/386/+Yq5lVJ+agOyu/E9" +
+            "ZjKZjojK2/DwmCeYKHrKyOsrzp8ZRohwRga0Ekn7hP25DigREA8kVwnjdBVeXt/eMUXxkRIBBszHn1+4b4ucQapniP7p+gd+AO0J" +
+            "edI54+N0AAAAAElFTkSuQmCC");
+        D.put("qs_toggle",
+            "iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAMAAACdt4HsAAACFlBMVEUAAAD/////////////////////////////////////////" +
+            "////////////////////////////////////////////////////////////////////////////////////////////////////" +
+            "////////////////////////////////////////////////////////////////////////////////////////////////////" +
+            "////////////////////////////////////////////////////////////////////////////////////////////////////" +
+            "////////////////////////////////////////////////////////////////////////////////////////////////////" +
+            "////////////////////////////////////////////////////////////////////////////////////////////////////" +
+            "////////////////////////////////////////////////////////////////////////////////////////////////////" +
+            "//////////////////////////////////////////////////////////////////8YiqUCAAAAsnRSTlMAAWCimZuXpzgCPaaY" +
+            "pU+G4dXX1tPoTgNV59Tlbn3HycvNysbIxdlJUNhnf8zOur3b3EpRaMN5PiogIzDQ0oQeQKrPXxGSZQ2fIi9xmm0Jo9pNkVPR32tE" +
+            "BItcVFZbLG8MLYgKNgeU4nVXJXhwdzmkwbuVOgvm5Cg7MiESh0OsjjOpwK9ZskZeLgUUYhuwninCtxpCdoPrjRi47ExFJ4AmPzwf" +
+            "QRbdfjfebOO0q7G2qBAGidurZAAAA35JREFUWMPtl4lT00AUxl/kkFVUckgwQpIupVAMCooo2AqWooiARStUOUTwQrzxRlRUVLxv" +
+            "QQURvPBA/A/d0CQ9aCGd0dEZ/WY67X7p/ubt7ntvNgD/pYuaUdP/89fFD3Pi4hOiKnFuEiAE8+Yn607ygoVAhQAWpdBMQCxR0JBb" +
+            "nAo8D2lLBN0RlqYDCgFkcKKkSxRliwVnWg0jy5atAnLsmbqTyeaGAZaxWPEL59mZrOUrcD6n6Ja1YKUKWJUvaYYi2QqjAGSZXV20" +
+            "Zm1xybq0eIcTxwyQFWF9qWaisg2sFCNAtrjKyYhHCPHkubvCjzUPwPRG4I3j4WFTJYdjAWC2gkJBx8vDZtEimwfICq4ik4KEYItN" +
+            "Mg+QmGoehWQootZaSQhmAZitCQ2A+LVbaWwAPFZZk9UecQ9cdRAaARluI2vQANtT8rya8nbURwLkNRA3pOh91M58DUDB5l2NTZoa" +
+            "m1vCimlqEx0Lp0dQoUcwSzn792A3IF/wdB+0LhCwDphKME08FQnAJPhgT2V8tb/m4yvb2qkW9XQNQJBQBIAsK3th3/6lAs0yLM3Z" +
+            "DzRRcNCu54GJJZBMrqagtY1zKqJkEeQOgEOiUQsU7OlMP6wp/cjRCJtICMJGsvKmY8cF+cTJLoBTcYIcqIW00xyriTtTE7kaFccc" +
+            "Mqw9e+78BfLdnUgHV2OOTcSaRCZKR5It3oslein1XOKkmBsKFvLx5ZyW0gtX6nttdm+sAMkpJNQVXbXbaLbAee16cx9jibEf9N0g" +
+            "idSd1HSzPPVWP8DtO5IXKzFUY/VdoJDxgMyBrhNObBYgsW3tUw0NkTwjH/KLQlB8z4nNAUT6/qnwWlK72oOHLtEMgHY9ejx9vkro" +
+            "MQXI4CxPIuc7gqcckz1rIj17/iK8RI2+ODD48tUsqQzwunMo0gL8IfQMD5FGNVMxzXZ7MKEo8eudaerhDA1FPfEgUWadX6k3I28N" +
+            "jbjVLRstCzhj71RnYCzglI2GdaRhhlxr/JKFJCBLLPRg3ZHe+xOpwHCwpzDqFUfBnB9gM/IulivOf8C/DfggWPVuY/V+VAG5jNF/" +
+            "Mj0mOtInL6fJ6+lSAeMpDt1xnalTAY2fDceRMh4GqP/S+1VT77cq9fWiY8Jwvg+uUZ2GwcB/JjrCGli7e9KtadLdrzq13QGn+4fq" +
+            "7At2an/rW58Z56977/uT+gnOyGoYoNo1YQAAAABJRU5ErkJggg==");
     }
 
     /** key: see SysUi.KK mapping table */
