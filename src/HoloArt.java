@@ -23,5 +23,20 @@ public class HoloArt {
 
     static Drawable plain(Resources res, String k) { init(); return VolArt.get(res, k); }
 
-    static Drawable nine(Resources res, String k) { init(); return VolArt.nine(res, k); }
+    /** lift the black fill to dark gray (JB look, ~#2A2A2A). 0 = keep TechnoUI's pure black. Alpha is untouched. */
+    static final int LIFT = 42;
+
+    static Drawable nine(Resources res, String k) {
+        init();
+        Drawable d = VolArt.nine(res, k);
+        if (LIFT > 0) {
+            float o = LIFT;
+            d.setColorFilter(new android.graphics.ColorMatrixColorFilter(new float[]{
+                1, 0, 0, 0, o,
+                0, 1, 0, 0, o,
+                0, 0, 1, 0, o,
+                0, 0, 0, 1, 0}));
+        }
+        return d;
+    }
 }

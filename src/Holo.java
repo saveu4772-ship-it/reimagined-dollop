@@ -80,6 +80,7 @@ public class Holo {
             v.setClipToOutline(false);
             v.setBackground(d);
             whiteText(v);
+            hideIcons(v);
             XposedBridge.log(TAG + "toast skinned " + v.getClass().getSimpleName());
             logTree("toast", v);
         } catch (Throwable t) { XposedBridge.log(TAG + "skinToast: " + t); }
@@ -152,6 +153,15 @@ public class Holo {
             g.setClipToOutline(false);
         }
         for (int i = 0; i < g.getChildCount(); i++) clearInnerBackgrounds(g.getChildAt(i), depth + 1);
+    }
+
+    /** ICS toasts had no app icon */
+    static void hideIcons(View v) {
+        if (v instanceof android.widget.ImageView) { v.setVisibility(View.GONE); return; }
+        if (v instanceof ViewGroup) {
+            ViewGroup g = (ViewGroup) v;
+            for (int i = 0; i < g.getChildCount(); i++) hideIcons(g.getChildAt(i));
+        }
     }
 
     static void whiteText(View v) {
