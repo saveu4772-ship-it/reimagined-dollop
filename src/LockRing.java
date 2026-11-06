@@ -4,11 +4,10 @@ import android.animation.ValueAnimator;
 import android.app.KeyguardManager;
 import android.content.Context;
 import android.content.Intent;
+import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Paint;
-import android.graphics.RadialGradient;
 import android.graphics.RectF;
-import android.graphics.Shader;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.PowerManager;
@@ -22,48 +21,58 @@ import android.widget.FrameLayout;
 import java.util.ArrayList;
 
 import de.robv.android.xposed.XposedBridge;
-import de.robv.android.xposed.XposedHelpers;
 
 /**
- * Jelly Bean GlowPad lock ring, modelled on AOSP's GlowPadView/PointCloud as seen on a JB lock screen:
- * a hairline ring with three flat white targets (camera left, search top, unlock right) and a dot cloud
- * (concentric bands of dots lit by a travelling wave and a glow that follows the finger). Touch the cloud to
- * get the lock handle; drag onto a target and the handle turns into a white disc with that target's icon.
- * Unlock goes through dismissKeyguard, so PIN/pattern still uses the normal bouncer.
+ * Port of the AOSP KitKat GlowPadView as used by Holo_Lock: dot cloud (PointCloud) + wave + glow, hairline
+ * outer ring, three targets (unlock right, search up, camera left) and the ringed lock handle, all with
+ * Holo_Lock's real bitmaps and AOSP's constants. Unlock replays a real swipe-up so SystemUI runs its own
+ * unlock/bouncer flow.
  */
 public class LockRing extends View {
     static final String TAG = "[IcsSysUi] ";
     static final String TAGKEY = "ics_lock_ring";
-    static final int T_CAMERA = 0, T_SEARCH = 1, T_UNLOCK = 2;
+    // slot order = AOSP: angle = -2*PI*i/4  ->  0 right, 1 up, 2 left, (3 down: empty)
+    static final int T_UNLOCK = 0, T_SEARCH = 1, T_CAMERA = 2;
+    static final String[] NORMAL = {"unlock", "assist", "camera"};
+    static final String[] ACTIVE = {"unlock_a", "assist_a", "camera_a"};
 
     final Handler h = new Handler(Looper.getMainLooper());
     final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
     final float u;                       // 1dp
+    final float k;                       // art scale: bitmaps are xhdpi (density 2.0)
     final View root;                     // keyguard window root
 
-    // interaction
+    // dimensions (Holo_Lock dimens.xml)
+    final float outerR, innerR, glowRadius, snapR;
+
+    // interaction state
     float dx, dy;                        // handle offset from centre
     boolean dragging;
     int hit = -1;
+    float handleA;
 
-    // point cloud (AOSP PointCloud): bands of dots + wave + glow
+    // point cloud: bands of dots + wave + glow
     float[] ptx, pty, ptr;
     int npts;
-    float outerR;
     float waveR, waveA, waveW;
     float glowX, glowY, glowR, glowA;
-    float cloudScale = 1f;
-    ValueAnimator pulser, touchAnim;
+    ValueAnimator waveAnim, handleAnim;
+    long suppressUntil;
 
     LockRing(Context c, View root) {
         super(c);
         this.root = root;
         u = c.getResources().getDisplayMetrics().density;
+        k = u / 2f;
+        outerR = 135 * u;
+        innerR = 15 * u;
+        glowRadius = 75 * u;
+        snapR = 52 * u;
+        waveW = 100 * u;                 // AOSP: 200px
+        glowR = glowRadius;
         setVisibility(View.GONE);
         buildCloud();
     }
-
-    float ringR() { return 125 * u; }
 
     // ------------------------------------------------------------ install
     static void attach(final View top) {
@@ -77,10 +86,10 @@ public class LockRing extends View {
                     LockRing r = new LockRing(f.getContext(), f);
                     r.setTag(TAGKEY);
                     int H = f.getContext().getResources().getDisplayMetrics().heightPixels;
-                    int size = (int) (310 * r.u);
-                    FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, size, Gravity.BOTTOM);
-                    // JB puts the ring centre at roughly 79% of the screen height
-                    lp.bottomMargin = Math.max(0, (int) (H - (H * 0.79f + size / 2f)));
+                    int size = (int) (400 * r.u);
+                    FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, size, Gravity.TOP);
+                    // JB/KK lock screen: ring centre at roughly 79% of the screen height
+                    lp.topMargin = (int) (H * 0.79f - size / 2f);
                     f.addView(r, lp);
                     XposedBridge.log(TAG + "lockring added to " + f.getClass().getSimpleName());
                 } catch (Throwable t) { XposedBridge.log(TAG + "lockring attach: " + t); }
@@ -143,16 +152,14 @@ public class LockRing extends View {
         else if (!show && getVisibility() == View.VISIBLE) { setVisibility(View.GONE); stopAnims(); reset(false); }
     }
 
-    // ------------------------------------------------------------ point cloud (port of AOSP PointCloud)
+    // ------------------------------------------------------------ point cloud (AOSP PointCloud)
     void buildCloud() {
-        float inner = 14 * u;
-        outerR = ringR() * 1.12f;
-        float area = outerR - inner;
-        float ds = (float) (2.0 * Math.PI * inner / 8.0);            // INNER_POINTS = 8
+        float area = outerR - innerR;
+        float ds = (float) (2.0 * Math.PI * innerR / 8.0);           // INNER_POINTS = 8
         int bands = Math.max(1, Math.round(area / ds));
         float dr = area / bands;
         ArrayList<float[]> pts = new ArrayList<float[]>();
-        float r = inner;
+        float r = innerR;
         for (int b = 0; b <= bands; b++, r += dr) {
             float circ = (float) (Math.PI * 2.0 * r);
             int n = Math.max(1, (int) (circ / ds));
@@ -165,84 +172,108 @@ public class LockRing extends View {
         npts = pts.size();
         ptx = new float[npts]; pty = new float[npts]; ptr = new float[npts];
         for (int i = 0; i < npts; i++) { float[] a = pts.get(i); ptx[i] = a[0]; pty[i] = a[1]; ptr[i] = a[2]; }
-        waveW = 80 * u;
     }
 
     float alphaFor(int i) {
-        float glowA2 = 0f;
+        float ga = 0f;
         float gd = (float) Math.hypot(glowX - ptx[i], glowY - pty[i]);
         if (glowA > 0f && gd < glowR) {
             float cf = (float) Math.cos(Math.PI * 0.25 * gd / glowR);
-            glowA2 = glowA * Math.max(0f, (float) Math.pow(cf, 10.0));
+            ga = glowA * Math.max(0f, (float) Math.pow(cf, 10.0));
         }
         float d = ptr[i] - waveR;
-        float waveA2 = 0f;
-        if (waveA > 0f && d < 0f) {
+        float wa = 0f;
+        if (waveA > 0f && d < waveW * 0.5f && d < 0f) {
             float cf = (float) Math.cos(Math.PI * 0.25 * d / waveW);
-            waveA2 = waveA * Math.max(0f, (float) Math.pow(cf, 20.0));
+            wa = waveA * Math.max(0f, (float) Math.pow(cf, 20.0));
         }
-        return Math.max(glowA2, waveA2);
+        return Math.max(ga, wa);
     }
 
     // ------------------------------------------------------------ animation
-    float ease(float t) { float v = 1f - t; return 1f - v * v * v * v; }      // quart out
-
-    void startPulse() {
-        if (pulser != null || dragging) return;
-        pulser = ValueAnimator.ofFloat(0f, 1f);
-        pulser.setDuration(3200);
-        pulser.setRepeatCount(ValueAnimator.INFINITE);
-        pulser.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
+    /** AOSP startWaveAnimation: radius handle/2 -> 2*outerRadius, 1350ms, Quad.easeOut, alpha 1 until the end */
+    void ping() {
+        if (waveAnim != null) waveAnim.cancel();
+        waveA = 1f;
+        waveAnim = ValueAnimator.ofFloat(0f, 1f);
+        waveAnim.setDuration(1350);
+        waveAnim.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
             @Override public void onAnimationUpdate(ValueAnimator a) {
                 float t = (Float) a.getAnimatedValue();
-                float w = Math.min(1f, t / 0.7f);                       // wave runs for 70%, then rests
-                waveR = 10 * u + ease(w) * 110 * u;
-                waveA = t < 0.7f ? 1f - w : 0f;
-                glowA = 0f;
+                float f = 2f * t - t * t;
+                waveR = 54 * u + f * (2f * outerR - 54 * u);
+                if (t >= 1f) { waveR = 0f; waveA = 0f; }
                 invalidate();
             }
         });
-        pulser.start();
+        waveAnim.start();
     }
+
+    final Runnable pingLoop = new Runnable() {
+        @Override public void run() {
+            if (getVisibility() == View.VISIBLE && !dragging) ping();
+            h.postDelayed(this, 4200);
+        }
+    };
+
+    void startPulse() { h.removeCallbacks(pingLoop); h.post(pingLoop); }
 
     void stopAnims() {
-        if (pulser != null) { pulser.cancel(); pulser = null; }
-        if (touchAnim != null) { touchAnim.cancel(); touchAnim = null; }
+        h.removeCallbacks(pingLoop);
+        if (waveAnim != null) { waveAnim.cancel(); waveAnim = null; }
+        if (handleAnim != null) { handleAnim.cancel(); handleAnim = null; }
+        waveA = 0f; glowA = 0f; handleA = 0f;
     }
 
-    /** finger down: dots spread to the full ring (the wave races outwards and settles dim) */
-    void touchWave() {
-        stopAnims();
-        glowX = 0; glowY = 0; glowR = 90 * u; glowA = 1f;
-        touchAnim = ValueAnimator.ofFloat(0f, 1f);
-        touchAnim.setDuration(700);
-        touchAnim.setInterpolator(new DecelerateInterpolator());
-        touchAnim.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
+    void fadeHandleIn() {
+        if (handleAnim != null) handleAnim.cancel();
+        handleAnim = ValueAnimator.ofFloat(handleA, 1f);
+        handleAnim.setDuration(200);
+        handleAnim.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
+            @Override public void onAnimationUpdate(ValueAnimator a) { handleA = (Float) a.getAnimatedValue(); invalidate(); }
+        });
+        handleAnim.start();
+    }
+
+    /** AOSP return-to-home: handle slides back to the centre and fades (200ms) */
+    void returnHome() {
+        if (handleAnim != null) handleAnim.cancel();
+        final float sx = dx, sy = dy, sa = handleA;
+        handleAnim = ValueAnimator.ofFloat(0f, 1f);
+        handleAnim.setDuration(200);
+        handleAnim.setInterpolator(new DecelerateInterpolator());
+        handleAnim.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
             @Override public void onAnimationUpdate(ValueAnimator a) {
-                float t = (Float) a.getAnimatedValue();
-                waveR = 20 * u + t * (outerR * 1.15f - 20 * u);
-                waveA = 1f - 0.55f * t;
+                float f = (Float) a.getAnimatedValue();
+                dx = sx * (1f - f); dy = sy * (1f - f); handleA = sa * (1f - f);
                 invalidate();
             }
         });
-        touchAnim.start();
+        handleAnim.start();
+    }
+
+    void reset(boolean animate) {
+        dx = 0; dy = 0; handleA = 0; hit = -1; dragging = false; glowA = 0;
+        invalidate();
     }
 
     // ------------------------------------------------------------ geometry
     float cx() { return getWidth() / 2f; }
     float cy() { return getHeight() / 2f; }
-    float tdx(int t) { return t == T_CAMERA ? -ringR() : t == T_UNLOCK ? ringR() : 0f; }
-    float tdy(int t) { return t == T_SEARCH ? -ringR() : 0f; }
+    float tx(int i) { return (float) (outerR * Math.cos(-2.0 * Math.PI * i / 4.0)); }
+    float ty(int i) { return (float) (outerR * Math.sin(-2.0 * Math.PI * i / 4.0)); }
 
     // ------------------------------------------------------------ touch
     @Override public boolean onTouchEvent(MotionEvent e) {
         float x = e.getX() - cx(), y = e.getY() - cy();
         switch (e.getActionMasked()) {
             case MotionEvent.ACTION_DOWN:
-                if (Math.hypot(x, y) > 70 * u) return false;           // only the middle grabs touches
+                if (Math.hypot(x, y) > glowRadius) return false;       // AOSP: touch must start inside the glow radius
                 dragging = true;
                 getParent().requestDisallowInterceptTouchEvent(true);
-                touchWave();
+                h.removeCallbacks(pingLoop);
+                ping();
+                fadeHandleIn();
                 move(x, y);
                 return true;
             case MotionEvent.ACTION_MOVE:
@@ -255,8 +286,7 @@ public class LockRing extends View {
                 dragging = false;
                 hit = -1;
                 glowA = 0f;
-                stopAnims();
-                reset(true);
+                returnHome();
                 startPulse();
                 if (fire == T_UNLOCK) unlock();
                 else if (fire == T_CAMERA) camera();
@@ -267,34 +297,18 @@ public class LockRing extends View {
     }
 
     void move(float x, float y) {
-        float max = ringR() * 1.25f, len = (float) Math.hypot(x, y);
-        if (len > max) { x = x / len * max; y = y / len * max; }
+        float len = (float) Math.hypot(x, y);
+        if (len > outerR) { x = x / len * outerR; y = y / len * outerR; }
         dx = x; dy = y;
         glowX = x; glowY = y;
         hit = -1;
         for (int t = 0; t < 3; t++)
-            if (Math.hypot(dx - tdx(t), dy - tdy(t)) < 48 * u) hit = t;
+            if (Math.hypot(dx - tx(t), dy - ty(t)) < snapR) hit = t;
+        glowA = hit >= 0 ? 0f : 1f;                                  // glow hides while a target is armed
         invalidate();
     }
 
-    void reset(boolean animate) {
-        if (!animate) { dx = 0; dy = 0; invalidate(); return; }
-        final float sx = dx, sy = dy;
-        ValueAnimator a = ValueAnimator.ofFloat(1f, 0f);
-        a.setDuration(220);
-        a.setInterpolator(new DecelerateInterpolator());
-        a.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
-            @Override public void onAnimationUpdate(ValueAnimator v) {
-                float f = (Float) v.getAnimatedValue();
-                dx = sx * f; dy = sy * f; invalidate();
-            }
-        });
-        a.start();
-    }
-
     // ------------------------------------------------------------ actions
-    long suppressUntil;
-
     /** unlock = replay a real swipe-up on the lock screen, so SystemUI runs its own unlock/bouncer flow */
     void unlock() {
         try {
@@ -307,12 +321,12 @@ public class LockRing extends View {
             final int steps = 12;
             sendTouch(r, MotionEvent.ACTION_DOWN, t0, t0, x, y0);
             for (int i = 1; i <= steps; i++) {
-                final int k = i;
+                final int kk = i;
                 h.postDelayed(new Runnable() {
                     @Override public void run() {
                         long now = android.os.SystemClock.uptimeMillis();
-                        float y = y0 + (y1 - y0) * k / steps;
-                        sendTouch(r, k == steps ? MotionEvent.ACTION_UP : MotionEvent.ACTION_MOVE, t0, now, x, y);
+                        float y = y0 + (y1 - y0) * kk / steps;
+                        sendTouch(r, kk == steps ? MotionEvent.ACTION_UP : MotionEvent.ACTION_MOVE, t0, now, x, y);
                     }
                 }, 16L * i);
             }
@@ -345,119 +359,49 @@ public class LockRing extends View {
     }
 
     // ------------------------------------------------------------ drawing
-    @Override protected void onDraw(Canvas c) {
-        float cx = cx(), cy = cy(), R = ringR();
-        if (pulser == null && touchAnim == null && !dragging) startPulse();
-
-        // hairline ring
-        p.setShader(null);
-        p.setStyle(Paint.Style.STROKE);
-        p.setStrokeWidth(1.2f * u);
-        p.setColor(0xFFFFFFFF);
-        p.setAlpha(dragging ? 70 : 42);
-        c.drawCircle(cx, cy, R, p);
-
-        // dot cloud
+    void bmp(Canvas c, String key, float x, float y, float alpha) {
+        if (alpha <= 0.01f) return;
+        Bitmap b = GlowArt.get(key);
+        float hw = b.getWidth() * k / 2f, hh = b.getHeight() * k / 2f;
         p.setStyle(Paint.Style.FILL);
-        p.setColor(0xFFFFFFFF);
+        p.setShader(null);
+        p.setFilterBitmap(true);
+        p.setAlpha((int) (Math.min(1f, alpha) * 255));
+        c.drawBitmap(b, null, new RectF(x - hw, y - hh, x + hw, y + hh), p);
+    }
+
+    @Override protected void onDraw(Canvas c) {
+        float cx = cx(), cy = cy();
+
+        // dot cloud: glowdot bitmap scaled pointSize/4 (pointSize 4 at the centre -> 2 at the rim), alpha from wave/glow
+        Bitmap dot = GlowArt.get("dot");
+        p.setFilterBitmap(true);
         for (int i = 0; i < npts; i++) {
             float a = alphaFor(i);
-            if (a < 0.03f) continue;
-            float f = ptr[i] / outerR;
-            float rad = (2.3f - 1.3f * f) * u;
+            if (a < 0.02f) continue;
+            float size = 4f + (2f - 4f) * (ptr[i] / outerR);
+            float s = size / 4f * k;
+            float px = cx + ptx[i], py = cy + pty[i];
             p.setAlpha((int) (Math.min(1f, a) * 255));
-            c.drawCircle(cx + ptx[i], cy + pty[i], rad, p);
+            float hw = dot.getWidth() * s / 2f, hh = dot.getHeight() * s / 2f;
+            c.drawBitmap(dot, null, new RectF(px - hw, py - hh, px + hw, py + hh), p);
         }
 
-        // targets: flat white icons on the ring (dim while the lock handle is held, bright when one is armed)
+        // outer ring: oval, 2dp stroke, #1affffff
+        p.setShader(null);
+        p.setStyle(Paint.Style.STROKE);
+        p.setStrokeWidth(2 * u);
+        p.setColor(0x1AFFFFFF);
+        c.drawCircle(cx, cy, outerR, p);
+
+        // targets (activated bitmap sits on the target itself)
+        float others = dragging && hit < 0 ? 0.6f : 1f;
         for (int t = 0; t < 3; t++) {
-            if (hit == t) continue;                                  // its icon is inside the handle
-            int al = dragging && hit < 0 ? 150 : 255;
-            drawTarget(c, t, cx + tdx(t), cy + tdy(t), 0xFFFFFFFF, al);
+            if (hit == t) bmp(c, ACTIVE[t], cx + tx(t), cy + ty(t), 1f);
+            else bmp(c, NORMAL[t], cx + tx(t), cy + ty(t), others);
         }
 
-        // handle
-        float px = cx + dx, py = cy + dy;
-        if (dragging) {
-            if (hit >= 0) {
-                p.setStyle(Paint.Style.FILL);
-                p.setShader(new RadialGradient(px, py, 52 * u, 0xAAFFFFFF, 0x00FFFFFF, Shader.TileMode.CLAMP));
-                c.drawCircle(px, py, 52 * u, p);
-                p.setShader(null);
-                p.setColor(0xFFFFFFFF);
-                p.setAlpha(255);
-                c.drawCircle(px, py, 29 * u, p);
-                drawTarget(c, hit, px, py, 0xFF000000, 255);
-            } else {
-                p.setStyle(Paint.Style.FILL);
-                p.setColor(0xFF000000);
-                p.setAlpha(110);
-                c.drawCircle(px, py, 23 * u, p);
-                p.setStyle(Paint.Style.STROKE);
-                p.setStrokeWidth(2.6f * u);
-                p.setColor(0xFFFFFFFF);
-                p.setAlpha(255);
-                c.drawCircle(px, py, 23 * u, p);
-                drawLock(c, px, py, false, 0xFFFFFFFF, 255, 0.8f);
-            }
-        }
-    }
-
-    void drawTarget(Canvas c, int t, float x, float y, int color, int alpha) {
-        if (t == T_CAMERA) drawCamera(c, x, y, color, alpha);
-        else if (t == T_SEARCH) drawSearch(c, x, y, color, alpha);
-        else drawLock(c, x, y, true, color, alpha, 1f);
-    }
-
-    void drawLock(Canvas c, float x, float y, boolean open, int color, int alpha, float s) {
-        c.save();
-        c.translate(x, y);
-        c.scale(s, s);
-        float v = u;
-        p.setColor(color);
-        p.setAlpha(alpha);
-        p.setStyle(Paint.Style.FILL);
-        c.drawRoundRect(new RectF(-9 * v, -2 * v, 9 * v, 13 * v), 2 * v, 2 * v, p);
-        p.setStyle(Paint.Style.STROKE);
-        p.setStrokeWidth(3f * v);
-        p.setStrokeCap(Paint.Cap.BUTT);
-        float lift = open ? 5 * v : 0;
-        c.drawArc(new RectF(-6 * v, -15 * v - lift, 6 * v, -3 * v - lift), 180, 180, false, p);
-        c.drawLine(-6 * v, -9 * v - lift, -6 * v, -2 * v, p);                 // left leg always reaches the body
-        if (!open) c.drawLine(6 * v, -9 * v, 6 * v, -2 * v, p);
-        // keyhole
-        p.setStyle(Paint.Style.FILL);
-        p.setColor(color == 0xFF000000 ? 0xFFFFFFFF : 0xFF000000);
-        p.setAlpha(alpha);
-        c.drawCircle(0, 5 * v, 2.2f * v, p);
-        c.drawRect(-0.9f * v, 5 * v, 0.9f * v, 9 * v, p);
-        c.restore();
-    }
-
-    void drawCamera(Canvas c, float x, float y, int color, int alpha) {
-        float v = u;
-        p.setColor(color);
-        p.setAlpha(alpha);
-        p.setStyle(Paint.Style.FILL);
-        c.drawRoundRect(new RectF(x - 16 * v, y - 9 * v, x + 16 * v, y + 11 * v), 2 * v, 2 * v, p);
-        c.drawRect(new RectF(x - 14 * v, y - 12 * v, x - 8 * v, y - 8 * v), p);
-        p.setColor(color == 0xFF000000 ? 0xFFFFFFFF : 0xFF000000);
-        p.setAlpha(alpha);
-        p.setStyle(Paint.Style.STROKE);
-        p.setStrokeWidth(2.6f * v);
-        c.drawCircle(x, y + 1.5f * v, 5f * v, p);
-    }
-
-    void drawSearch(Canvas c, float x, float y, int color, int alpha) {
-        float v = u;
-        p.setColor(color);
-        p.setAlpha(alpha);
-        p.setStyle(Paint.Style.STROKE);
-        p.setStrokeWidth(3.2f * v);
-        p.setStrokeCap(Paint.Cap.ROUND);
-        c.drawCircle(x - 3 * v, y - 3 * v, 8.5f * v, p);
-        p.setStrokeWidth(4.4f * v);
-        c.drawLine(x + 3.5f * v, y + 3.5f * v, x + 11 * v, y + 11 * v, p);
-        p.setStrokeCap(Paint.Cap.BUTT);
+        // handle: the ringed lock, follows the finger; hidden while a target is armed
+        if (handleA > 0f && hit < 0) bmp(c, "handle", cx + dx, cy + dy, handleA);
     }
 }
