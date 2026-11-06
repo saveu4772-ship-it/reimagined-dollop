@@ -84,7 +84,43 @@ public class VolumePanel {
             }
             XposedBridge.log(TAG + "methods in " + n + ": " + seen);
         }
+        total += hookShowRequested(cl);
         XposedBridge.log(TAG + (total == 0 ? "no volume dialog method hooked" : "volume hooks: " + total));
+    }
+
+    /**
+     * Second, more robust path: the controller dispatches onShowRequested(reason, keyguard, lockTask)
+     * to every callback (VolumeDialogControllerImpl$C), and VolumeDialogImpl's own callback calls showH
+     * from there. Replace it wherever it exists so the stock panel is never asked to show.
+     */
+    static int hookShowRequested(ClassLoader cl) {
+        java.util.ArrayList<String> cands = new java.util.ArrayList<String>();
+        cands.add("com.android.systemui.volume.VolumeDialogControllerImpl$C");
+        for (int i = 1; i <= 12; i++) cands.add("com.android.systemui.volume.VolumeDialogControllerImpl$" + i);
+        for (int i = 1; i <= 40; i++) cands.add("com.android.systemui.volume.VolumeDialogImpl$" + i);
+        int hooked = 0;
+        for (String n : cands) {
+            Class<?> c = XposedHelpers.findClassIfExists(n, cl);
+            if (c == null) continue;
+            StringBuilder ms = new StringBuilder();
+            for (java.lang.reflect.Method m : c.getDeclaredMethods()) {
+                ms.append(m.getName()).append(' ');
+                if (!m.getName().equals("onShowRequested")) continue;
+                try {
+                    XposedBridge.hookMethod(m, new XC_MethodReplacement() {
+                        @Override protected Object replaceHookedMethod(MethodHookParam p) {
+                            try { show(currentApp()); } catch (Throwable t) { XposedBridge.log(TAG + "show(req): " + t); }
+                            return null;
+                        }
+                    });
+                    hooked++;
+                    XposedBridge.log(TAG + "hooked " + n + ".onShowRequested");
+                } catch (Throwable t) { XposedBridge.log(TAG + "hook failed " + n + ": " + t); }
+            }
+            if (n.endsWith("$C")) XposedBridge.log(TAG + "methods in " + n + ": " + ms);
+        }
+        if (hooked == 0) XposedBridge.log(TAG + "onShowRequested not found in controller/dialog callbacks");
+        return hooked;
     }
 
     static Context currentApp() {
@@ -94,6 +130,7 @@ public class VolumePanel {
 
     // ---------------------------------------------------------------- show / hide
     static void show(final Context c) {
+        XposedBridge.log(TAG + "show requested");
         H.post(new Runnable() {
             @Override public void run() {
                 try {
