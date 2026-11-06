@@ -4,6 +4,7 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.res.Resources;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Paint;
@@ -11,29 +12,29 @@ import android.graphics.Path;
 import android.graphics.PixelFormat;
 import android.graphics.RectF;
 import android.graphics.drawable.BitmapDrawable;
-import android.graphics.drawable.ClipDrawable;
 import android.graphics.drawable.Drawable;
-import android.graphics.drawable.GradientDrawable;
-import android.graphics.drawable.LayerDrawable;
 import android.media.AudioManager;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.TypedValue;
 import android.view.Gravity;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowManager;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
-import android.widget.SeekBar;
 
 import de.robv.android.xposed.XC_MethodReplacement;
 import de.robv.android.xposed.XposedBridge;
 import de.robv.android.xposed.XposedHelpers;
 
-/** KitKat-style volume panel: slides in from the top, Holo-blue sliders, expand arrow. */
+/**
+ * TechnoUI / KitKat style volume panel: a dark bar under the status bar with a big speaker icon,
+ * a flat thick cyan slider with a round knob, and an expand chevron.
+ */
 public class VolumePanel {
     static final String TAG = "[IcsVol] ";
-    static final int BLUE = 0xFF33B5E5;
+    static final int CYAN = 0xFF33B5E5;
     static final int[] STREAMS = {AudioManager.STREAM_MUSIC, AudioManager.STREAM_RING, AudioManager.STREAM_ALARM};
     static final Handler H = new Handler(Looper.getMainLooper());
 
@@ -43,7 +44,7 @@ public class VolumePanel {
     static boolean expanded;
     static BroadcastReceiver rcv;
     static final LinearLayout[] rows = new LinearLayout[3];
-    static final SeekBar[] bars = new SeekBar[3];
+    static final FlatSlider[] bars = new FlatSlider[3];
     static final ImageView[] arrows = new ImageView[3];
     static final Runnable AUTO = new Runnable() { @Override public void run() { hide(); } };
 
@@ -107,10 +108,11 @@ public class VolumePanel {
                                         | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
                                 PixelFormat.TRANSLUCENT);
                         lp.gravity = Gravity.TOP;
+                        lp.y = statusBarHeight(c);               // sits directly under the status bar
                         ((WindowManager) c.getSystemService(Context.WINDOW_SERVICE)).addView(root, lp);
                         register(c);
-                        root.setTranslationY(-dp(c, 120));
-                        root.animate().translationY(0).setDuration(150).start();
+                        root.setAlpha(0f);
+                        root.animate().alpha(1f).setDuration(120).start();
                     }
                     refresh();
                     H.removeCallbacks(AUTO);
@@ -129,7 +131,7 @@ public class VolumePanel {
         try { if (rcv != null) ctx.unregisterReceiver(rcv); } catch (Throwable ignored) {}
         rcv = null;
         final Context c = ctx;
-        r.animate().translationY(-r.getHeight()).setDuration(130).withEndAction(new Runnable() {
+        r.animate().alpha(0f).setDuration(120).withEndAction(new Runnable() {
             @Override public void run() {
                 try { ((WindowManager) c.getSystemService(Context.WINDOW_SERVICE)).removeView(r); }
                 catch (Throwable ignored) {}
@@ -152,11 +154,18 @@ public class VolumePanel {
         return (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, v, c.getResources().getDisplayMetrics());
     }
 
+    static int statusBarHeight(Context c) {
+        Resources r = c.getResources();
+        int id = r.getIdentifier("status_bar_height", "dimen", "android");
+        return id > 0 ? r.getDimensionPixelSize(id) : dp(c, 24);
+    }
+
+    static void bump() { H.removeCallbacks(AUTO); H.postDelayed(AUTO, 3000); }
+
     static View build(final Context c) {
         LinearLayout panel = new LinearLayout(c);
         panel.setOrientation(LinearLayout.VERTICAL);
-        panel.setBackgroundColor(0xF2101010);
-        panel.setPadding(dp(c, 8), dp(c, 4), dp(c, 8), dp(c, 4));
+        panel.setBackgroundColor(0xFF121418);
         panel.setClickable(true);
         for (int i = 0; i < 3; i++) {
             final int idx = i;
@@ -166,37 +175,35 @@ public class VolumePanel {
 
             ImageView ic = new ImageView(c);
             ic.setImageDrawable(icon(c, i));
-            row.addView(ic, new LinearLayout.LayoutParams(dp(c, 44), dp(c, 44)));
+            ic.setScaleType(ImageView.ScaleType.FIT_CENTER);
+            ic.setPadding(dp(c, 12), dp(c, 8), dp(c, 10), dp(c, 8));
+            row.addView(ic, new LinearLayout.LayoutParams(dp(c, 59), dp(c, 45)));
 
-            SeekBar sb = new SeekBar(c);
-            sb.setProgressDrawable(track(c));
-            sb.setThumb(thumb(c));
-            sb.setThumbOffset(0);
-            sb.setPadding(dp(c, 12), 0, dp(c, 12), 0);
-            sb.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-                @Override public void onProgressChanged(SeekBar s, int p, boolean fromUser) {
-                    if (!fromUser) return;
-                    try { am.setStreamVolume(STREAMS[idx], p, 0); } catch (Throwable t) { XposedBridge.log(TAG + "set: " + t); }
-                    H.removeCallbacks(AUTO); H.postDelayed(AUTO, 3000);
+            FlatSlider fs = new FlatSlider(c);
+            fs.cb = new FlatSlider.OnChange() {
+                @Override public void onChange(int v) {
+                    try { am.setStreamVolume(STREAMS[idx], v, 0); } catch (Throwable t) { XposedBridge.log(TAG + "set: " + t); }
+                    bump();
                 }
-                @Override public void onStartTrackingTouch(SeekBar s) { H.removeCallbacks(AUTO); }
-                @Override public void onStopTrackingTouch(SeekBar s) { H.postDelayed(AUTO, 3000); }
-            });
-            row.addView(sb, new LinearLayout.LayoutParams(0, dp(c, 44), 1f));
-            bars[i] = sb;
+            };
+            row.addView(fs, new LinearLayout.LayoutParams(0, dp(c, 45), 1f));
+            bars[i] = fs;
 
             ImageView ar = new ImageView(c);
             ar.setImageDrawable(arrow(c));
-            ar.setPadding(dp(c, 8), dp(c, 8), dp(c, 8), dp(c, 8));
+            ar.setScaleType(ImageView.ScaleType.CENTER);
             ar.setOnClickListener(new View.OnClickListener() {
-                @Override public void onClick(View v) { expanded = !expanded; refresh(); H.removeCallbacks(AUTO); H.postDelayed(AUTO, 3000); }
+                @Override public void onClick(View v) { expanded = !expanded; refresh(); bump(); }
             });
-            row.addView(ar, new LinearLayout.LayoutParams(dp(c, 44), dp(c, 44)));
+            row.addView(ar, new LinearLayout.LayoutParams(dp(c, 60), dp(c, 45)));
             arrows[i] = ar;
 
             rows[i] = row;
-            panel.addView(row, new LinearLayout.LayoutParams(-1, -2));
+            panel.addView(row, new LinearLayout.LayoutParams(-1, dp(c, 45)));
         }
+        View line = new View(c);
+        line.setBackgroundColor(0x44FFFFFF);
+        panel.addView(line, new LinearLayout.LayoutParams(-1, Math.max(1, dp(c, 0.5f))));
         return panel;
     }
 
@@ -204,47 +211,60 @@ public class VolumePanel {
         if (am == null) return;
         int primary = am.isMusicActive() ? 0 : 1;
         for (int i = 0; i < 3; i++) {
-            try {
-                bars[i].setMax(am.getStreamMaxVolume(STREAMS[i]));
-                bars[i].setProgress(am.getStreamVolume(STREAMS[i]));
-            } catch (Throwable ignored) {}
+            try { bars[i].set(am.getStreamMaxVolume(STREAMS[i]), am.getStreamVolume(STREAMS[i])); }
+            catch (Throwable ignored) {}
             rows[i].setVisibility(expanded || i == primary ? View.VISIBLE : View.GONE);
             arrows[i].setVisibility(i == primary ? View.VISIBLE : View.INVISIBLE);
             arrows[i].setRotation(expanded ? 180 : 0);
         }
     }
 
-    // ---------------------------------------------------------------- drawing helpers
-    static Drawable track(Context c) {
-        GradientDrawable bg = new GradientDrawable();
-        bg.setColor(0x55FFFFFF);
-        bg.setSize(-1, dp(c, 3));
-        GradientDrawable fg = new GradientDrawable();
-        fg.setColor(BLUE);
-        fg.setSize(-1, dp(c, 3));
-        ClipDrawable clip = new ClipDrawable(fg, Gravity.LEFT, ClipDrawable.HORIZONTAL);
-        LayerDrawable ld = new LayerDrawable(new Drawable[]{bg, clip});
-        ld.setId(0, android.R.id.background);
-        ld.setId(1, android.R.id.progress);
-        return ld;
+    /** Flat, thick slider like TechnoUI: gray track, cyan fill, round cyan knob. */
+    static class FlatSlider extends View {
+        interface OnChange { void onChange(int v); }
+        OnChange cb;
+        int max = 15, progress;
+        final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
+        final float d;
+
+        FlatSlider(Context c) { super(c); d = c.getResources().getDisplayMetrics().density; }
+
+        void set(int m, int v) { max = Math.max(1, m); progress = v; invalidate(); }
+
+        @Override protected void onDraw(Canvas cv) {
+            float w = getWidth(), h = getHeight();
+            float bh = 24 * d, top = (h - bh) / 2f;
+            float x = w * progress / (float) max;
+            p.setColor(0xFF666666);
+            cv.drawRect(0, top, w, top + bh, p);
+            p.setColor(CYAN);
+            cv.drawRect(0, top, x, top + bh, p);
+            float r = bh * 0.36f;
+            cv.drawCircle(Math.min(Math.max(x, r), w - r), h / 2f, r, p);
+        }
+
+        @Override public boolean onTouchEvent(MotionEvent e) {
+            int a = e.getActionMasked();
+            if (a == MotionEvent.ACTION_DOWN) getParent().requestDisallowInterceptTouchEvent(true);
+            if (a == MotionEvent.ACTION_DOWN || a == MotionEvent.ACTION_MOVE) {
+                int v = Math.round(Math.max(0f, Math.min(1f, e.getX() / Math.max(1, getWidth()))) * max);
+                if (v != progress) { progress = v; invalidate(); if (cb != null) cb.onChange(v); }
+            }
+            if (a == MotionEvent.ACTION_UP || a == MotionEvent.ACTION_CANCEL) bump();
+            return true;
+        }
     }
 
-    static Drawable thumb(Context c) {
-        GradientDrawable g = new GradientDrawable();
-        g.setShape(GradientDrawable.OVAL);
-        g.setColor(BLUE);
-        g.setSize(dp(c, 18), dp(c, 18));
-        return g;
-    }
-
+    // ---------------------------------------------------------------- icons
     static Drawable arrow(Context c) {
         int s = 96;
         Bitmap b = Bitmap.createBitmap(s, s, Bitmap.Config.ARGB_8888);
         Canvas cv = new Canvas(b);
         Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
-        p.setColor(0xFFFFFFFF); p.setStyle(Paint.Style.STROKE); p.setStrokeWidth(8);
+        p.setColor(0xFFFFFFFF); p.setStyle(Paint.Style.STROKE); p.setStrokeWidth(9);
+        p.setStrokeCap(Paint.Cap.SQUARE);
         Path pa = new Path();
-        pa.moveTo(24, 36); pa.lineTo(48, 62); pa.lineTo(72, 36);
+        pa.moveTo(22, 34); pa.lineTo(48, 62); pa.lineTo(74, 34);
         cv.drawPath(pa, p);
         return new BitmapDrawable(c.getResources(), b);
     }
@@ -259,12 +279,12 @@ public class VolumePanel {
         if (kind == 0) {
             p.setStyle(Paint.Style.FILL);
             Path sp = new Path();
-            sp.moveTo(14, 38); sp.lineTo(32, 38); sp.lineTo(54, 18); sp.lineTo(54, 78);
-            sp.lineTo(32, 58); sp.lineTo(14, 58); sp.close();
+            sp.moveTo(6, 36); sp.lineTo(26, 36); sp.lineTo(52, 12); sp.lineTo(52, 84);
+            sp.lineTo(26, 60); sp.lineTo(6, 60); sp.close();
             cv.drawPath(sp, p);
-            p.setStyle(Paint.Style.STROKE); p.setStrokeWidth(7);
-            cv.drawArc(new RectF(40, 30, 76, 66), -50, 100, false, p);
-            cv.drawArc(new RectF(34, 18, 90, 78), -50, 100, false, p);
+            p.setStyle(Paint.Style.STROKE); p.setStrokeWidth(8); p.setStrokeCap(Paint.Cap.ROUND);
+            cv.drawArc(new RectF(40, 30, 76, 66), -55, 110, false, p);
+            cv.drawArc(new RectF(34, 16, 92, 80), -55, 110, false, p);
         } else if (kind == 1) {
             p.setStyle(Paint.Style.FILL);
             Path bp = new Path();
@@ -275,7 +295,7 @@ public class VolumePanel {
             cv.drawPath(bp, p);
             cv.drawCircle(48, 78, 8, p);
         } else {
-            p.setStyle(Paint.Style.STROKE); p.setStrokeWidth(7);
+            p.setStyle(Paint.Style.STROKE); p.setStrokeWidth(8);
             cv.drawCircle(48, 52, 28, p);
             cv.drawLine(48, 52, 48, 36, p);
             cv.drawLine(48, 52, 60, 58, p);
