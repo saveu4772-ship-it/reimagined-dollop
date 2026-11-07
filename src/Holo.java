@@ -181,6 +181,12 @@ public class Holo {
         if (isSwitch(v)) {
             if (v.getTag(KEY_WIDGET) != null) return;
             v.setTag(KEY_WIDGET, Boolean.TRUE);
+            String cn = v.getClass().getName().toLowerCase();
+            if (cn.contains("coui") || cn.contains("oplus")) {      // realme's switch paints itself: draw our own
+                HoloSwitch.install(v);
+                XposedBridge.log(TAG + "dialog switch (custom draw) " + v.getClass().getSimpleName());
+                return;
+            }
             android.content.res.Resources r = v.getResources();
             float d = r.getDisplayMetrics().density;
             nullTint(v, "setThumbTintList", android.content.res.ColorStateList.class);
