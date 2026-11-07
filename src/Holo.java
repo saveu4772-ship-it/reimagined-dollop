@@ -151,8 +151,74 @@ public class Holo {
         XposedBridge.log(TAG + "dialog skinned " + d.getClass().getSimpleName());
     }
 
+    static final int KEY_WIDGET = 0x1c5ec10f;
+    static final int HOLO_BLUE = 0xFF33B5E5;
+
+    static boolean isSwitch(View v) {
+        if (!(v instanceof android.widget.CompoundButton)) return false;
+        for (Class<?> c = v.getClass(); c != null; c = c.getSuperclass()) {
+            String n = c.getSimpleName();
+            if (n.equals("Switch") || n.equals("SwitchCompat")) return true;
+        }
+        return false;
+    }
+
+    static boolean modernBlue(int c) {
+        int r = (c >> 16) & 255, b = c & 255, a = (c >>> 24);
+        return a > 200 && b > 180 && r < 110 && b - r > 90;
+    }
+
+    static void call(View v, String name, Object... args) {
+        try { XposedHelpers.callMethod(v, name, args); } catch (Throwable ignored) {}
+    }
+
+    static void nullTint(View v, String name, Class<?> type) {
+        try { XposedHelpers.callMethod(v, name, new Class<?>[]{type}, new Object[]{null}); } catch (Throwable ignored) {}
+    }
+
+    /** ICS holo switch (slanted thumb, ON/OFF on the track), holo blue accents, flat holo buttons */
+    static void holoWidgets(View v) {
+        if (isSwitch(v)) {
+            if (v.getTag(KEY_WIDGET) != null) return;
+            v.setTag(KEY_WIDGET, Boolean.TRUE);
+            android.content.res.Resources r = v.getResources();
+            float d = r.getDisplayMetrics().density;
+            nullTint(v, "setThumbTintList", android.content.res.ColorStateList.class);
+            nullTint(v, "setTrackTintList", android.content.res.ColorStateList.class);
+            nullTint(v, "setTrackDecorationDrawable", Drawable.class);
+            nullTint(v, "setThumbIconDrawable", Drawable.class);
+            call(v, "setTrackDrawable", HoloArt.switchTrack(r));
+            call(v, "setThumbDrawable", HoloArt.switchThumb(r));
+            call(v, "setSwitchMinWidth", (int) (72 * d));
+            call(v, "setThumbTextPadding", (int) (6 * d));
+            call(v, "setShowText", true);
+            call(v, "setTextOn", (CharSequence) "ON");
+            call(v, "setTextOff", (CharSequence) "OFF");
+            try { XposedHelpers.setObjectField(v, "mTextColors", android.content.res.ColorStateList.valueOf(0xFFFFFFFF)); } catch (Throwable ignored) {}
+            v.requestLayout();
+            XposedBridge.log(TAG + "dialog switch styled " + v.getClass().getSimpleName());
+            return;
+        }
+        if (v instanceof TextView) {
+            TextView t = (TextView) v;
+            if (modernBlue(t.getCurrentTextColor())) t.setTextColor(HOLO_BLUE);
+            if (v instanceof android.widget.Button && v.getTag(KEY_WIDGET) == null) {
+                v.setTag(KEY_WIDGET, Boolean.TRUE);
+                android.graphics.drawable.StateListDrawable s = new android.graphics.drawable.StateListDrawable();
+                s.addState(new int[]{android.R.attr.state_pressed}, new android.graphics.drawable.ColorDrawable(0x8033B5E5));
+                s.addState(new int[]{android.R.attr.state_focused}, new android.graphics.drawable.ColorDrawable(0x4033B5E5));
+                s.addState(new int[]{}, new android.graphics.drawable.ColorDrawable(0x00000000));
+                v.setBackground(s);
+                try { v.setStateListAnimator(null); } catch (Throwable ignored) {}
+                if (!modernBlue(t.getCurrentTextColor()) && t.getCurrentTextColor() != HOLO_BLUE) t.setTextColor(0xFFFFFFFF);
+                XposedBridge.log(TAG + "dialog button styled " + v.getClass().getSimpleName());
+            }
+        }
+    }
+
     /** square every rounded card background in the tree (any depth), no clipping to rounded outlines */
     static void flatten(View v) {
+        try { holoWidgets(v); } catch (Throwable t) { XposedBridge.log(TAG + "holoWidgets: " + t); }
         Drawable bg = v.getBackground();
         if (bg != null) LockText.square(bg, 0);
         if (v instanceof ViewGroup) {

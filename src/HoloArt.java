@@ -18,6 +18,12 @@ public class HoloArt {
         VolArt.put("pm_vibrate", 320, "iVBORw0KGgoAAAANSUhEUgAAACQAAAAkCAMAAADW3miqAAABWVBMVEUAAAD///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////8l0s7tAAAAc3RSTlMAATIwIUIuBhdsXAUga3BqWS0IGAQCSm4jWlccPW9LMR0pWGlQJBkMY0YKNmFoFSZHM3FAZw4RRGIJD2BtURY3QU9eLGQiVTpbA04HXRMnSTUUEGVDUjhyKAtMc1MSPjkbVEgrHx47Xw1mL0U/JXYqGjw07BuSWQAAAnhJREFUOMt1lGlb2kAUhc+gohjDICbGBeISFVQiLkFAcWmkQESrEDdal7q1xdZu//9DJ1TDJA/Oh+TJzZsz5y4ZoNMipGO0dQ10sbfdPcHe10AHri/UL2BADNPIYLQDRoYkEHlYGYEwOjZMRXEsKPgwgnExBozEVRkTyiSmpinVIlOEpwiRZpRZRCPaHBLJeWZrYTFFdaoucWIE6fgysLLK1NaMTCu19ayh0dyK0KbyKW0JG7nNDIYKi07YwSa3NI3ObLtUfnkH2F2dgPzOzP8vEbvKe6OiWHzf1pKZ9VIvZpW0G2P3RDlHK1bburVf6Eb1YMaTEHBomm0IH8JHMo5Dc57ayKhpAc56xdhG3T7x1c867a++tpHg7LwMnNgJD0Rwobi+CdaLBw2MK12+fgnmR66aR5+CsC77BeIVWhS3OWhNlXjpF+bKuGbeOWFUN1V/1+eTed+w3IhLPqHPhUEkovwc1PVrL0Ok0rQgq7cNrgV3yQWf0L3ygNn4vtRmHsN7vvSruTtUI1qfWydijZ3KsuwRKutXOD6PcZvdK5dD/EgTHNIv2Eh+/dYONkxDb8Y2wH2mbkbRsxp060QQoLbdDJlP1stPSfBQuMCkWBL4PoYYVNTF24HWSLL0I5cW+zm6sV53Mem7qNtN29a0u1oLeyqM4yK+bElbbO5dV1OmI2bbYrKcABbsrDNhNQaqEleZTFbTis0ms1bZk3/YddywCYtW9JonZzyPhgzHmkZLzR0c2gcJnP0s+3qFRjkVMorOnpEqsuFfwO9sxtcH9pT5wzC7SNN4Vk4t8tbBdRXL0fiRhXTqEeSNM8o5BP4GnFGz8PbqfAziHz9sWyOJ3bJVAAAAAElFTkSuQmCC");
         VolArt.put("pm_air", 160, "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAMAAABEpIrGAAABDlBMVEUAAACwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLDar58/AAAAWXRSTlMAAQMPPgR6PMKSC+C2AhDsuhLtvLcFTvzcHQqT/utV1/r9+54Hits9N9DzyqnBg+eCqF5PwMYj79hvplOx9oC5YZVRLLB2kUoGfBG4hE3lrpvH6CRgJhZAL7zUxlkAAAEYSURBVDjLzVLHQsJAEH27SbCuiooRjZpgIvauYMWu2Lu+//8RB06AZD3owdnjvJl9ZYA/LqV/Asizth3XCvCQYQe0bUMnuwSW3u/uYS+MBdDXz4HfAbKDHLIATG3DMHJpfa0x4nM0D0+lmDw2TgacmITRbcfdKYYRCz6nne9LNOIkCCLWKuRMEdq08J+dY8T5ZIGLS/KNv+w1paaQCcmV1TzWuI6NTcFubTfIFYNKLO84InCXe/J/cf+Ahw2ZCKByFIuOHI55glhGT8/Om1JVBkqIe7jgpTSEoblqcaGuK0aVbt1J3fYoNK5veAujUrO6u6fPh2zKXSo8slB+KvH5JSVQVX19i/H+kXxaErdfvfaEn9Kewj+rL56DIsd1WH31AAAAAElFTkSuQmCC");
         VolArt.put("pm_warn", 160, "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAMAAABEpIrGAAABF1BMVEUAAAD////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////jvJXZAAAAXHRSTlMAAQMRNwKnW1DgFAjT+YsEc/v+9Ssd6/ytmf1MOWUkmM4Fu0CF+G5aT5f65hoO2liklX1ksDPwcby2onzGVUOO1NcKw3hj8+0gNYGeiKk8Kvbyv0njCzZKRkdLIdsaD70AAAE0SURBVDjLvVNXV8IwGL2JVgVUTBzFqLgXKg7cC/fee9z//ztMW05ZLb5x24ecfDd35LRAsyHkfwT7NBy3tIpGDAdtbEe8i0QHmUjGugikOtnF7liJNHqoNHv7rFW0QP8AtXaZiSFIDNIlaTgUaeJg2JAj2VFybDwqp8AEFScxxWnO2Dz1BrN0DecwzxwXFuskBJbyNIrLWKFSXK1LkcaaNVAsYN2rqjZqmjjIbtLucwvbtorLnRqCxK5XUXEP+97C8KDKROLQnvcIRRzZqX2PTypzCnHq31EZLs8qqkqcB3PNfObC19K8vApjCCQTnq43ucaNNfIlbsMUEnfBptYspO5LYpoPJYaDxyftGh9aPetgZXJ8CQVefYMaGL69h0U+Pr++Sygvfn4bf+HVFxkJp1l/6x9xTUuR30YNoQAAAABJRU5ErkJggg==");
+        VolArt.put("sw_track", DPI, "iVBORw0KGgoAAAANSUhEUgAAABcAAAAfCAYAAAAMeVbNAAAAAXNSR0IArs4c6QAAAARzQklUCAgICHwIZIgAAABUSURBVEiJY2AgDfwnUf0QBYzIHBMTk5mUGnjmzJl0KPM/E6WG4QOjho8aPmr4YDecZsUoEwNa4UVtw2kGRg0fNXzU8EFsOM2KFdoDdKdTWvyimAcAx60IMnsZQZgAAAAASUVORK5CYII=");
+        VolArt.put("sw_track_f", DPI, "iVBORw0KGgoAAAANSUhEUgAAABcAAAAfCAYAAAAMeVbNAAAAAXNSR0IArs4c6QAAAARzQklUCAgICHwIZIgAAAB/SURBVEiJ7dZBCoAgEIXhf8Ij2Zk8UtiV8kxNC1tYUDBo0GLeSkQ+xcXwwBa1HBaAvJFF2I0XPb9AmdJMAmAtLKPg1gvtZowx98KllHQuderF3uK4447/HTeNUSsuX+KfxXHHHf8xLpdS1BSaIQlQu93ISqdaf+Q+EXvH78U7AONMGwCEWbVpAAAAAElFTkSuQmCC");
+        VolArt.put("sw_track_d", DPI, "iVBORw0KGgoAAAANSUhEUgAAABcAAAAfCAYAAAAMeVbNAAAAAXNSR0IArs4c6QAAAARzQklUCAgICHwIZIgAAAB2SURBVEiJY2AgDfwnUf0QBYzIHGNj4zZGRsa75Br2//9/5bNnz1bBuCiSJiYmyeQajEX/fyZKDCMERg0fNXzUcCoYTrNilIkBrfCituE0A6OGjxo+ajiFgAWZ8///f2VKmhf///9XRuLSrFihPUB3OqXFL4p5AEu8Fm4FRwiiAAAAAElFTkSuQmCC");
+        VolArt.put("sw_thumb", DPI, "iVBORw0KGgoAAAANSUhEUgAAADcAAAAeCAYAAACIeIa4AAAAAXNSR0IArs4c6QAAAARzQklUCAgICHwIZIgAAADmSURBVFiF7ZnLDcIwEERnUgb3dEAnyYluaIAyuLmTdMCdMrIckJBCfv5FaFbMyba01jw93wwcGzv4/n9chng/HQJA3/c3ku1vK00zjuM1hDBkjFoz2ZndK3WqFpKX3NkJXAhhMLNHeaV6Idl2XXfOmW2+DzzZm8F5sjeDA/zYW4TzYm8RDvBhbxXOg71VOEDf3iacur1NOEDb3i6csr1dOEDXXhScqr0oOEDTXjScor1oOEDPXhKcmr0kOEDLXjKckr1kOEDHXhacir0sOEDHntuwZNjMTrWK1ArJ52ddeNfRHx1F/V7wgZgw2DY/7QAAAABJRU5ErkJggg==");
+        VolArt.put("sw_thumb_p", DPI, "iVBORw0KGgoAAAANSUhEUgAAADcAAAAeCAYAAACIeIa4AAAAAXNSR0IArs4c6QAAAARzQklUCAgICHwIZIgAAAFdSURBVFiF7ZjPTcMwFId/z45JKzEBE2QSVmgrRqg4Zooeq2xAJSpOXDsJEzABEqVWYg6RUKH58+wk4hnxO8VRHPnLF7/EBqaNm/j+//mTIdSvDgHAKn96Tsw8+90hfU9l3+53m+UhoKtLzlsKZUFab6lmFRFXzdYAQuCgzhu7zfJQ2Y+XUUY1UpRJs0X+eBvU9+cJWx4LJ6jIEQhGz9YhfS/g9kLt3QXYu4ADZNojfeVtrxFOpr25t71GOABwIu35zb1WuLpyvguzl2aL/IFtrxUOAGx5EmfP6Gu2vU64vVB73LnXCQfItMede71wMisnz14vHBBv5WTByf3n7K6cLDhApr2+ysmGi9EeGw6Iz54XnFx7zZXTCw6QuWJoW+95w8X03fOGA2TOvabvXhBcLCuGpO3ivtjyVJAyWwjaKVNIg3fKosugx+6cuxlrIGOFiF6/jgfea+qqMmh8n9PCrtXuBIVOAAAAAElFTkSuQmCC");
+        VolArt.put("sw_thumb_d", DPI, "iVBORw0KGgoAAAANSUhEUgAAADcAAAAeCAYAAACIeIa4AAAAAXNSR0IArs4c6QAAAARzQklUCAgICHwIZIgAAADdSURBVFiF7Zk7DsIwEAXX26ag5gbcx/Ip90r01CloHQq2ANlJ/IkVvVVeR+HRjiYdRGO3DOZfMzlH30/HERF57x/MPJ17UrKniMwN7xb+/cXMr4MOOmwxxnvr2z85EZljjO/+k44bM08hhFvT2wzMTL1EzlK9RE5hJupl5azUy8opDL7eqpyFeqtyCoOutymHXm9TTmGw9XblkOvtyikMsl6RHGq9IjmFwdUrlkOsVyynMKh6VXJo9arkFAZTr1oOqV61nMIg6jXJodRrklMYRL1riHOd70f/0dF13we7LpEvXB0jOQAAAABJRU5ErkJggg==");
         VolArt.put("dialog_div", DPI, "iVBORw0KGgoAAAANSUhEUgAAAAsAAAAGCAYAAAAVMmT4AAAAAXNSR0IArs4c6QAAAARzQklUCAgICHwIZIgAAABESURBVBiVY2DADv5jE2SC0i0MDAxvoYr+I2n4DxVvQdb09sCBA57///+3RscHDhzwRDIIq8n/cZmM1X3YACMhTyGrAwDx6CnAhMxQlwAAAABJRU5ErkJggg==");
     }
 
@@ -25,6 +31,25 @@ public class HoloArt {
 
     /** lift the black fill to dark gray (JB look, ~#2A2A2A). 0 = keep TechnoUI's pure black. Alpha is untouched. */
     static final int LIFT = 42;
+
+    /** 9-patch without the gray lift (switch art keeps its own colours) */
+    static Drawable ninePlain(Resources res, String k) { init(); return VolArt.nine(res, k); }
+
+    static Drawable switchTrack(Resources r) {
+        android.graphics.drawable.StateListDrawable s = new android.graphics.drawable.StateListDrawable();
+        s.addState(new int[]{-android.R.attr.state_enabled}, ninePlain(r, "sw_track_d"));
+        s.addState(new int[]{android.R.attr.state_focused}, ninePlain(r, "sw_track_f"));
+        s.addState(new int[]{}, ninePlain(r, "sw_track"));
+        return s;
+    }
+
+    static Drawable switchThumb(Resources r) {
+        android.graphics.drawable.StateListDrawable s = new android.graphics.drawable.StateListDrawable();
+        s.addState(new int[]{-android.R.attr.state_enabled}, ninePlain(r, "sw_thumb_d"));
+        s.addState(new int[]{android.R.attr.state_pressed}, ninePlain(r, "sw_thumb_p"));
+        s.addState(new int[]{}, ninePlain(r, "sw_thumb"));
+        return s;
+    }
 
     static Drawable nine(Resources res, String k) {
         init();
