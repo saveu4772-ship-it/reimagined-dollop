@@ -21,6 +21,8 @@ public class HoloSwitch {
     static final String TAG = "[IcsSysUi] ";
     static final int KEY_ON = 0x1c5ec110, KEY_P = 0x1c5ec111;
     static final int TRACK = 0xFF262626, THUMB_OFF = 0xFF666666, THUMB_ON = 0xFF1A94C9;
+    /** switch size in dp (ICS proportions) */
+    static final int SW_W = 104, SW_H = 32;
     static final HashSet<Class<?>> hooked = new HashSet<Class<?>>();
     static final Paint pt = new Paint(Paint.ANTI_ALIAS_FLAG);
     static final Path path = new Path();
@@ -57,12 +59,31 @@ public class HoloSwitch {
                         View sw = (View) p.thisObject;
                         if (sw.getTag(KEY_ON) == null) return;
                         float d = sw.getResources().getDisplayMetrics().density;
-                        try { XposedHelpers.callMethod(sw, "setMeasuredDimension", (int) (88 * d), (int) (32 * d)); }
+                        try { XposedHelpers.callMethod(sw, "setMeasuredDimension", (int) (SW_W * d), (int) (SW_H * d)); }
                         catch (Throwable t) { XposedBridge.log(TAG + "holoswitch measure: " + t); }
                     }
                 });
             }
         }
+        // the dialog's layout fixes COUISwitch's size, so set it on the layout params too
+        final View sw = v;
+        v.post(new Runnable() {
+            @Override public void run() {
+                try {
+                    float d = sw.getResources().getDisplayMetrics().density;
+                    android.view.ViewGroup.LayoutParams lp = sw.getLayoutParams();
+                    if (lp != null) {
+                        lp.width = (int) (SW_W * d);
+                        lp.height = (int) (SW_H * d);
+                        sw.setLayoutParams(lp);
+                    }
+                    sw.setMinimumWidth((int) (SW_W * d));
+                    sw.setMinimumHeight((int) (SW_H * d));
+                    sw.requestLayout();
+                    sw.invalidate();
+                } catch (Throwable t) { XposedBridge.log(TAG + "holoswitch size: " + t); }
+            }
+        });
         v.requestLayout();
         v.invalidate();
     }
